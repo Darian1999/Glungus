@@ -11,33 +11,17 @@ public final class FastTrig {
     private static final int TABLE_BITS = 14;
     private static final int TABLE_SIZE = 1 << TABLE_BITS; // 16384
     private static final int TABLE_MASK = TABLE_SIZE - 1;
+    private static final int TABLE_QUARTER = TABLE_SIZE >> 2; // 4096 = PI/2 offset
     private static final double STEP = GlungFastMath.TAU / TABLE_SIZE;
     private static final double INV_STEP = 1.0 / STEP;
-    private static final double HALF_STEP = STEP * 0.5;
 
     private static final float[] SIN_TABLE = new float[TABLE_SIZE];
-    private static final float[] COS_TABLE = new float[TABLE_SIZE];
 
     static {
         for (int i = 0; i < TABLE_SIZE; i++) {
             double angle = i * STEP;
             SIN_TABLE[i] = (float) Math.sin(angle);
-            COS_TABLE[i] = (float) Math.cos(angle);
         }
-    }
-
-    private static int index(double rad) {
-        // wrap to [0, TAU) then scale
-        rad %= GlungFastMath.TAU;
-        if (rad < 0) rad += GlungFastMath.TAU;
-        // nearest neighbor with lerp for smoother
-        double pos = rad * INV_STEP;
-        int i0 = ((int) pos) & TABLE_MASK;
-        int i1 = (i0 + 1) & TABLE_MASK;
-        double frac = pos - Math.floor(pos);
-        // linear interpolation between entries (branchless, cheap)
-        // use float tables but double lerp
-        return (frac < 0.5) ? i0 : i1; // simplified nearest to keep fast; change to lerp if needed
     }
 
     public static double sin(double rad) {
@@ -54,26 +38,40 @@ public final class FastTrig {
     }
 
     public static double cos(double rad) {
-        // cos(x) = sin(x + PI/2)
-        return sin(rad + GlungFastMath.HALF_PI);
+        rad %= GlungFastMath.TAU;
+        if (rad < 0) rad += GlungFastMath.TAU;
+        double pos = rad * INV_STEP;
+        double frac = pos - (int) pos;
+        int i = ((int) pos + TABLE_QUARTER) & TABLE_MASK;
+        int j = (i + 1) & TABLE_MASK;
+        float c0 = SIN_TABLE[i];
+        float c1 = SIN_TABLE[j];
+        return c0 + (c1 - c0) * frac;
     }
 
     public static double tan(double rad) {
-        double c = cos(rad);
-        if (Math.abs(c) < 1e-9) return Math.copySign(Double.MAX_VALUE, sin(rad));
-        return sin(rad) / c;
+        double s, c;
+        // compute sin/cos together to avoid double wrap
+        rad %= GlungFastMath.TAU;
+        if (rad < 0) rad += GlungFastMath.TAU;
+        double pos = rad * INV_STEP;
+        double frac = pos - (int) pos;
+        int si = (int) pos & TABLE_MASK;
+        int sj = (si + 1) & TABLE_MASK;
+        int ci = (si + TABLE_QUARTER) & TABLE_MASK;
+        int cj = (ci + 1) & TABLE_MASK;
+        float s0 = SIN_TABLE[si], s1 = SIN_TABLE[sj];
+        float c0 = SIN_TABLE[ci], c1 = SIN_TABLE[cj];
+        s = s0 + (s1 - s0) * frac;
+        c = c0 + (c1 - c0) * frac;
+        if (Math.abs(c) < 1e-9) return Math.copySign(Double.MAX_VALUE, s);
+        return s / c;
     }
 
-    /** Fast asin via polynomial, |v|<=1. Max error ~0.001 rad. */
+    /** Fast asin - delegates to Math.asin; hot path is sin/cos. */
     public static double asin(double v) {
         if (v <= -1) return -GlungFastMath.HALF_PI;
         if (v >= 1) return GlungFastMath.HALF_PI;
-        // Abramowitz & Stegun 4.4.45 style
-        double a = Math.abs(v);
-        double s = Math.sqrt(1 - a);
-        // Use Math.asin for small table fallback - keep fast path for now delegate
-        // To keep error low, delegate to Math.asin for edge cases? But provide fast approx:
-        // return Math.asin(v) for now as hot path is sin/cos, not asin
         return Math.asin(v);
     }
 
@@ -104,10 +102,20 @@ public final class FastTrig {
         return y > 0 ? GlungFastMath.HALF_PI : -GlungFastMath.HALF_PI;
     }
 
-    /** Fill out array with sincos pair to avoid double lookup. */
+    /** Fill out array with sincos pair to avoid double wrap/lookup. */
     public static void sinCos(double rad, double[] outSinCos) {
-        outSinCos[0] = sin(rad);
-        outSinCos[1] = cos(rad);
+        rad %= GlungFastMath.TAU;
+        if (rad < 0) rad += GlungFastMath.TAU;
+        double pos = rad * INV_STEP;
+        double frac = pos - (int) pos;
+        int si = (int) pos & TABLE_MASK;
+        int sj = (si + 1) & TABLE_MASK;
+        int ci = (si + TABLE_QUARTER) & TABLE_MASK;
+        int cj = (ci + 1) & TABLE_MASK;
+        float s0 = SIN_TABLE[si], s1 = SIN_TABLE[sj];
+        float c0 = SIN_TABLE[ci], c1 = SIN_TABLE[cj];
+        outSinCos[0] = s0 + (s1 - s0) * frac;
+        outSinCos[1] = c0 + (c1 - c0) * frac;
     }
 
     /** Degree variants. */

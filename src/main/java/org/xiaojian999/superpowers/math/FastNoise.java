@@ -62,10 +62,12 @@ public final class FastNoise {
     }
 
     public static double perlin2D(double x, double y) {
-        int xi = GlungFastMath.fastFloor(x) & 255;
-        int yi = GlungFastMath.fastFloor(y) & 255;
-        double xf = x - Math.floor(x);
-        double yf = y - Math.floor(y);
+        int xi0 = GlungFastMath.fastFloor(x);
+        int yi0 = GlungFastMath.fastFloor(y);
+        int xi = xi0 & 255;
+        int yi = yi0 & 255;
+        double xf = x - xi0;
+        double yf = y - yi0;
         double u = fade(xf);
         double v = fade(yf);
         int aa = PERM[PERM[xi] + yi];
@@ -78,12 +80,15 @@ public final class FastNoise {
     }
 
     public static double perlin3D(double x, double y, double z) {
-        int xi = GlungFastMath.fastFloor(x) & 255;
-        int yi = GlungFastMath.fastFloor(y) & 255;
-        int zi = GlungFastMath.fastFloor(z) & 255;
-        double xf = x - Math.floor(x);
-        double yf = y - Math.floor(y);
-        double zf = z - Math.floor(z);
+        int xi0 = GlungFastMath.fastFloor(x);
+        int yi0 = GlungFastMath.fastFloor(y);
+        int zi0 = GlungFastMath.fastFloor(z);
+        int xi = xi0 & 255;
+        int yi = yi0 & 255;
+        int zi = zi0 & 255;
+        double xf = x - xi0;
+        double yf = y - yi0;
+        double zf = z - zi0;
         double u = fade(xf);
         double v = fade(yf);
         double w = fade(zf);

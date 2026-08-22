@@ -263,18 +263,31 @@ public final class GlungFastMath {
     //  Easing
     // ========================================================================
     public static double easeInQuad(double t) { return t * t; }
-    public static double easeOutQuad(double t) { return 1 - (1 - t) * (1 - t); }
-    public static double easeInOutQuad(double t) { return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; }
+    public static double easeOutQuad(double t) { double u = 1 - t; return 1 - u * u; }
+    public static double easeInOutQuad(double t) {
+        if (t < 0.5) return 2 * t * t;
+        double u = 1 - t;
+        return 1 - 2 * u * u;
+    }
     public static double easeInCubic(double t) { return t * t * t; }
-    public static double easeOutCubic(double t) { return 1 - Math.pow(1 - t, 3); }
-    public static double easeInOutCubic(double t) { return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; }
+    public static double easeOutCubic(double t) { double u = 1 - t; return 1 - u * u * u; }
+    public static double easeInOutCubic(double t) {
+        if (t < 0.5) return 4 * t * t * t;
+        double u = 1 - t;
+        return 1 - 4 * u * u * u;
+    }
     public static double easeInQuart(double t) { double t2 = t * t; return t2 * t2; }
     public static double easeOutQuart(double t) { double u = 1 - t; double u2 = u * u; return 1 - u2 * u2; }
-    public static double easeInOutQuart(double t) { return t < 0.5 ? 8 * t * t * t * t : 1 - 8 * Math.pow(1 - t, 4); }
+    public static double easeInOutQuart(double t) {
+        if (t < 0.5) return 8 * t * t * t * t;
+        double u = 1 - t;
+        double u2 = u * u;
+        return 1 - 8 * u2 * u2;
+    }
     public static double easeInExpo(double t) { return t == 0 ? 0 : Math.pow(2, 10 * (t - 1)); }
     public static double easeOutExpo(double t) { return t == 1 ? 1 : 1 - Math.pow(2, -10 * t); }
     public static double easeInCirc(double t) { return 1 - Math.sqrt(1 - t * t); }
-    public static double easeOutCirc(double t) { return Math.sqrt(1 - Math.pow(t - 1, 2)); }
+    public static double easeOutCirc(double t) { double u = t - 1; return Math.sqrt(1 - u * u); }
     public static double easeInBack(double t) { double c1 = 1.70158; return c1 * t * t * t - c1 * t * t; }
     public static double easeOutBack(double t) { double c1 = 1.70158; double c2 = c1 + 1; double u = t - 1; return 1 + c2 * u * u * u + c1 * u * u; }
     public static double easeOutBounce(double t) {
@@ -485,15 +498,35 @@ public final class GlungFastMath {
         double c = fastCos(rad), s = fastSin(rad);
         return new double[]{c, -s, 0, 0, s, c, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
     }
+    public static void mat4Multiply(double[] a, double[] b, double[] out) {
+        double a00 = a[0], a01 = a[1], a02 = a[2], a03 = a[3];
+        double a10 = a[4], a11 = a[5], a12 = a[6], a13 = a[7];
+        double a20 = a[8], a21 = a[9], a22 = a[10], a23 = a[11];
+        double a30 = a[12], a31 = a[13], a32 = a[14], a33 = a[15];
+        double b00 = b[0], b01 = b[1], b02 = b[2], b03 = b[3];
+        double b10 = b[4], b11 = b[5], b12 = b[6], b13 = b[7];
+        double b20 = b[8], b21 = b[9], b22 = b[10], b23 = b[11];
+        double b30 = b[12], b31 = b[13], b32 = b[14], b33 = b[15];
+        out[0]  = a00 * b00 + a01 * b10 + a02 * b20 + a03 * b30;
+        out[1]  = a00 * b01 + a01 * b11 + a02 * b21 + a03 * b31;
+        out[2]  = a00 * b02 + a01 * b12 + a02 * b22 + a03 * b32;
+        out[3]  = a00 * b03 + a01 * b13 + a02 * b23 + a03 * b33;
+        out[4]  = a10 * b00 + a11 * b10 + a12 * b20 + a13 * b30;
+        out[5]  = a10 * b01 + a11 * b11 + a12 * b21 + a13 * b31;
+        out[6]  = a10 * b02 + a11 * b12 + a12 * b22 + a13 * b32;
+        out[7]  = a10 * b03 + a11 * b13 + a12 * b23 + a13 * b33;
+        out[8]  = a20 * b00 + a21 * b10 + a22 * b20 + a23 * b30;
+        out[9]  = a20 * b01 + a21 * b11 + a22 * b21 + a23 * b31;
+        out[10] = a20 * b02 + a21 * b12 + a22 * b22 + a23 * b32;
+        out[11] = a20 * b03 + a21 * b13 + a22 * b23 + a23 * b33;
+        out[12] = a30 * b00 + a31 * b10 + a32 * b20 + a33 * b30;
+        out[13] = a30 * b01 + a31 * b11 + a32 * b21 + a33 * b31;
+        out[14] = a30 * b02 + a31 * b12 + a32 * b22 + a33 * b32;
+        out[15] = a30 * b03 + a31 * b13 + a32 * b23 + a33 * b33;
+    }
     public static double[] mat4Multiply(double[] a, double[] b) {
         double[] r = new double[16];
-        for (int row = 0; row < 4; row++) {
-            for (int col = 0; col < 4; col++) {
-                double sum = 0;
-                for (int k = 0; k < 4; k++) sum += a[row * 4 + k] * b[k * 4 + col];
-                r[row * 4 + col] = sum;
-            }
-        }
+        mat4Multiply(a, b, r);
         return r;
     }
     public static Vec3d mat4TransformPos(double[] m, Vec3d v) {

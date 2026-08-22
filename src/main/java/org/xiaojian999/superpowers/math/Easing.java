@@ -12,20 +12,33 @@ public final class Easing {
 
     // ---- Quad
     public static double inQuad(double t) { return t * t; }
-    public static double outQuad(double t) { return 1 - (1 - t) * (1 - t); }
-    public static double inOutQuad(double t) { return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; }
+    public static double outQuad(double t) { double u = 1 - t; return 1 - u * u; }
+    public static double inOutQuad(double t) {
+        if (t < 0.5) return 2 * t * t;
+        double u = 1 - t;
+        return 1 - 2 * u * u;
+    }
 
     // ---- Cubic
     public static double inCubic(double t) { return t * t * t; }
-    public static double outCubic(double t) { return 1 - Math.pow(1 - t, 3); }
-    public static double inOutCubic(double t) { return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; }
+    public static double outCubic(double t) { double u = 1 - t; return 1 - u * u * u; }
+    public static double inOutCubic(double t) {
+        if (t < 0.5) return 4 * t * t * t;
+        double u = 1 - t;
+        return 1 - 4 * u * u * u;
+    }
 
     // ---- Quart / Quint / Expo / Circ
     public static double inQuart(double t) { double t2 = t * t; return t2 * t2; }
     public static double outQuart(double t) { double u = 1 - t; double u2 = u * u; return 1 - u2 * u2; }
-    public static double inOutQuart(double t) { return t < 0.5 ? 8 * t * t * t * t : 1 - 8 * Math.pow(1 - t, 4); }
-    public static double inQuint(double t) { return t * t * t * t * t; }
-    public static double outQuint(double t) { return 1 - Math.pow(1 - t, 5); }
+    public static double inOutQuart(double t) {
+        if (t < 0.5) return 8 * t * t * t * t;
+        double u = 1 - t;
+        double u2 = u * u;
+        return 1 - 8 * u2 * u2;
+    }
+    public static double inQuint(double t) { double t2 = t * t; return t2 * t2 * t; }
+    public static double outQuint(double t) { double u = 1 - t; double u2 = u * u; return 1 - u2 * u2 * u; }
     public static double inExpo(double t) { return t == 0 ? 0 : Math.pow(2, 10 * (t - 1)); }
     public static double outExpo(double t) { return t == 1 ? 1 : 1 - Math.pow(2, -10 * t); }
     public static double inOutExpo(double t) {
@@ -33,10 +46,15 @@ public final class Easing {
         return t < 0.5 ? Math.pow(2, 20 * t - 10) / 2 : (2 - Math.pow(2, -20 * t + 10)) / 2;
     }
     public static double inCirc(double t) { return 1 - Math.sqrt(1 - t * t); }
-    public static double outCirc(double t) { return Math.sqrt(1 - Math.pow(t - 1, 2)); }
+    public static double outCirc(double t) { double u = t - 1; return Math.sqrt(1 - u * u); }
     public static double inOutCirc(double t) {
-        return t < 0.5 ? (1 - Math.sqrt(1 - Math.pow(2 * t, 2))) / 2
-                : (Math.sqrt(1 - Math.pow(-2 * t + 2, 2)) + 1) / 2;
+        if (t < 0.5) {
+            double u = 2 * t;
+            return (1 - Math.sqrt(1 - u * u)) * 0.5;
+        } else {
+            double u = -2 * t + 2;
+            return (Math.sqrt(1 - u * u) + 1) * 0.5;
+        }
     }
 
     // ---- Back (overshoot)
@@ -51,8 +69,13 @@ public final class Easing {
     }
     public static double inOutBack(double t) {
         double c1 = 1.70158, c2 = c1 * 1.525;
-        return t < 0.5 ? (Math.pow(2 * t, 2) * ((c2 + 1) * 2 * t - c2)) / 2
-                : (Math.pow(2 * t - 2, 2) * ((c2 + 1) * (2 * t - 2) + c2) + 2) / 2;
+        if (t < 0.5) {
+            double u = 2 * t;
+            return (u * u * ((c2 + 1) * u - c2)) * 0.5;
+        } else {
+            double u = 2 * t - 2;
+            return (u * u * ((c2 + 1) * u + c2) + 2) * 0.5;
+        }
     }
 
     // ---- Elastic
