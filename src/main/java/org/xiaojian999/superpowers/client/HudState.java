@@ -81,6 +81,18 @@ final class HudState {
         return hasFlag(PowerStatusPayload.GOD_NOCLIP_ACTIVE);
     }
 
+    static boolean isGodModeActive() {
+        return hasFlag(PowerStatusPayload.GOD_MODE_ACTIVE);
+    }
+
+    static boolean isGodGiantActive() {
+        return hasFlag(PowerStatusPayload.GOD_GIANT_ACTIVE);
+    }
+
+    static boolean isGodTelekinesisActive() {
+        return hasFlag(PowerStatusPayload.GOD_TELEKINESIS_ACTIVE);
+    }
+
     private static boolean hasFlag(int flag) {
         for (Slot slot : SLOTS) {
             if ((slot.flags & flag) != 0) {

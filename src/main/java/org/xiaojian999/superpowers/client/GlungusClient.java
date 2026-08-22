@@ -147,6 +147,8 @@ public class GlungusClient implements ClientModInitializer {
         PayloadRegistry.ensureRegistered(PowerStatusPayload.class, PayloadDirection.S2C);
         PayloadRegistry.ensureRegistered(LightningFormStatePayload.class, PayloadDirection.S2C);
         PayloadRegistry.ensureRegistered(NatureEarthquakePayload.class, PayloadDirection.S2C);
+        PayloadRegistry.ensureRegistered(GodGiantPayload.class, PayloadDirection.C2S);
+        PayloadRegistry.ensureRegistered(GodTelekinesisPayload.class, PayloadDirection.C2S);
         PayloadRegistryClient.registerGenericClient();
 
         // Dev-build notice: once the world loads, show a chat message if this is a developer build
@@ -164,6 +166,7 @@ public class GlungusClient implements ClientModInitializer {
                         PowerManager.setClientGhostFormActive(playerUuid, HudState.isGhostFormActive());
                         PowerManager.setClientLightningFormActive(playerUuid, HudState.isLightningFormActive());
                         PowerManager.setClientGodNoClipActive(playerUuid, HudState.isGodNoClipActive());
+                        PowerManager.setClientGodModeActive(playerUuid, HudState.isGodModeActive());
                     }
                 }));
         ClientPlayNetworking.registerGlobalReceiver(LightningFormStatePayload.ID, (payload, context) ->
@@ -245,19 +248,35 @@ public class GlungusClient implements ClientModInitializer {
                 ClientPlayNetworking.send(new UsePowerPayload(1));
             }
             while (SECOND_POWER_KEY.wasPressed()) {
-                ClientPlayNetworking.send(new UsePowerPayload(2));
+                if (GodHud.isGodModeActive()) {
+                    ClientPlayNetworking.send(new GodGiantPayload());
+                } else {
+                    ClientPlayNetworking.send(new UsePowerPayload(2));
+                }
             }
             while (ULTIMATE_KEY.wasPressed()) {
-                ClientPlayNetworking.send(new UsePowerPayload(3));
+                if (GodHud.isGodModeActive()) {
+                    ClientPlayNetworking.send(new GodTelekinesisPayload());
+                } else {
+                    ClientPlayNetworking.send(new UsePowerPayload(3));
+                }
             }
             while (FOURTH_POWER_KEY.wasPressed()) {
                 ClientPlayNetworking.send(new UsePowerPayload(4));
             }
             while (FIFTH_POWER_KEY.wasPressed()) {
-                ClientPlayNetworking.send(new UsePowerPayload(5));
+                if (GodHud.isGodModeActive()) {
+                    ClientPlayNetworking.send(new GodGiantPayload());
+                } else {
+                    ClientPlayNetworking.send(new UsePowerPayload(5));
+                }
             }
             while (SIXTH_POWER_KEY.wasPressed()) {
-                ClientPlayNetworking.send(new UsePowerPayload(6));
+                if (GodHud.isGodModeActive()) {
+                    ClientPlayNetworking.send(new GodTelekinesisPayload());
+                } else {
+                    ClientPlayNetworking.send(new UsePowerPayload(6));
+                }
             }
             while (GHOST_SPEED_UP_KEY.wasPressed()) {
                 if (GhostHud.isGhostFormActive()) {

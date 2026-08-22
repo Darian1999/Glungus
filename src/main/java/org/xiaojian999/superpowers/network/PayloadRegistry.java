@@ -625,6 +625,8 @@ public final class PayloadRegistry {
         autoRegister(org.xiaojian999.superpowers.GodOmnipotencePayload.class, PayloadDirection.C2S);
         autoRegister(org.xiaojian999.superpowers.GodBanishPayload.class, PayloadDirection.C2S);
         autoRegister(org.xiaojian999.superpowers.GodNoClipPayload.class, PayloadDirection.C2S);
+        autoRegister(org.xiaojian999.superpowers.GodGiantPayload.class, PayloadDirection.C2S);
+        autoRegister(org.xiaojian999.superpowers.GodTelekinesisPayload.class, PayloadDirection.C2S);
         autoRegister(org.xiaojian999.superpowers.PowerStatusPayload.class, PayloadDirection.S2C);
         autoRegister(org.xiaojian999.superpowers.LightningFormStatePayload.class, PayloadDirection.S2C);
         autoRegister(org.xiaojian999.superpowers.NatureEarthquakePayload.class, PayloadDirection.S2C);

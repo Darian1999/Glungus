@@ -39,6 +39,8 @@ public record PowerStatusPayload(
     public static final int GOD_EQUIPPED = 1 << 18;
     public static final int GOD_MODE_ACTIVE = 1 << 19;
     public static final int GOD_NOCLIP_ACTIVE = 1 << 20;
+    public static final int GOD_GIANT_ACTIVE = 1 << 21;
+    public static final int GOD_TELEKINESIS_ACTIVE = 1 << 22;
 
     public static final CustomPayload.Id<PowerStatusPayload> ID =
             new CustomPayload.Id<>(Identifier.of(Glungus.MOD_ID, "power_status"));

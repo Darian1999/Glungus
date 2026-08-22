@@ -71,6 +71,8 @@ public final class PowerManager {
         org.xiaojian999.superpowers.network.PayloadRegistry.ensureRegistered(GodOmnipotencePayload.class, org.xiaojian999.superpowers.network.PayloadDirection.C2S);
         org.xiaojian999.superpowers.network.PayloadRegistry.ensureRegistered(GodBanishPayload.class, org.xiaojian999.superpowers.network.PayloadDirection.C2S);
         org.xiaojian999.superpowers.network.PayloadRegistry.ensureRegistered(GodNoClipPayload.class, org.xiaojian999.superpowers.network.PayloadDirection.C2S);
+        org.xiaojian999.superpowers.network.PayloadRegistry.ensureRegistered(GodGiantPayload.class, org.xiaojian999.superpowers.network.PayloadDirection.C2S);
+        org.xiaojian999.superpowers.network.PayloadRegistry.ensureRegistered(GodTelekinesisPayload.class, org.xiaojian999.superpowers.network.PayloadDirection.C2S);
 
         ServerPlayNetworking.registerGlobalReceiver(UsePowerPayload.ID, (payload, context) ->
                 context.server().execute(() -> usePower(context.player(), payload.slot())));
@@ -96,6 +98,10 @@ public final class PowerManager {
                 context.server().execute(() -> GodPowerHandler.banishTarget(context.player())));
         ServerPlayNetworking.registerGlobalReceiver(GodNoClipPayload.ID, (payload, context) ->
                 context.server().execute(() -> GodPowerHandler.toggleNoClip(context.player())));
+        ServerPlayNetworking.registerGlobalReceiver(GodGiantPayload.ID, (payload, context) ->
+                context.server().execute(() -> GodPowerHandler.toggleGiant(context.player())));
+        ServerPlayNetworking.registerGlobalReceiver(GodTelekinesisPayload.ID, (payload, context) ->
+                context.server().execute(() -> GodPowerHandler.toggleTelekinesis(context.player())));
 
         UseEntityCallback.EVENT.register((player, world, hand, entity, hitResult) -> {
             if (world.isClient() || !(player instanceof ServerPlayerEntity serverPlayer)) {
@@ -268,7 +274,7 @@ public final class PowerManager {
         String ultimateKey = slotIndex == 0 ? "keypad 3" : "keypad 6";
         String controls = selectedPower == Power.GOD
                 ? "toggle with keypad " + (slotIndex == 0 ? "1" : "4")
-                        + "; KP7 bless, KP8 levitate, KP9 laser, KP0 smite, KP. blast, KPENTER nova, KP* omnipotence, KP/ banish"
+                        + "; KP2 giant, KP3 telekinesis, KP7 bless, KP8 levitate, KP9 laser, KP0 smite, KP. blast, KPENTER nova, KP* omnipotence, KP/ banish"
                 : "use " + keys + " (ultimate = double-tap " + ultimateKey + ")";
         context.getSource().sendFeedback(
                 () -> Text.literal("Slot " + (slotIndex + 1) + ": " + powerName
@@ -308,6 +314,9 @@ public final class PowerManager {
         }
 
         if (localSlot == 3) {
+            if (power == Power.GOD) {
+                return GodPowerHandler.toggleTelekinesis(player);
+            }
             return handleUltimatePress(player, power, slotKey);
         }
 
@@ -333,7 +342,7 @@ public final class PowerManager {
                 case WATER -> WaterPowerHandler.startTidalWave(player, slotKey);
                 case LIGHTNING -> LightningPowerHandler.summonLightningStrike(player, slotKey);
                 case NATURE -> NaturePowerHandler.startVineRing(player, slotKey);
-                case GOD -> 0;
+                case GOD -> GodPowerHandler.toggleGiant(player);
             };
         }
 
@@ -361,7 +370,7 @@ public final class PowerManager {
         }
         if (power == Power.GOD) {
             player.sendMessage(Text.literal(
-                    "God Mode has no ultimate — use the divine keys: KP7 bless, KP8 levitate, KP9 laser, KP0 smite, KP. blast, KPENTER nova, KP* omnipotence, KP/ banish."
+                    "God Mode has no ultimate — use the divine keys: KP2 giant, KP3 telekinesis, KP7 bless, KP8 levitate, KP9 laser, KP0 smite, KP. blast, KPENTER nova, KP* omnipotence, KP/ banish."
             ), true);
             return 0;
         }
@@ -423,12 +432,25 @@ public final class PowerManager {
 
     /** Whether a player currently has God Mode enabled. */
     public static boolean isGodModeActive(Entity entity) {
-        return entity instanceof PlayerEntity player && GodPowerHandler.isActive(player.getUuid());
+        return entity instanceof PlayerEntity player
+                && (GodPowerHandler.isActive(player.getUuid()) || GodPowerHandler.isClientGodModeActive(player.getUuid()));
+    }
+
+    public static void setClientGodModeActive(UUID playerUuid, boolean active) {
+        GodPowerHandler.setClientGodModeActive(playerUuid, active);
     }
 
     /** Whether a player is currently simulating omnipotence (invulnerable + divine buffs). */
     public static boolean isOmnipotenceActive(Entity entity) {
         return entity instanceof PlayerEntity player && GodPowerHandler.isOmnipotenceActive(player.getUuid());
+    }
+
+    public static boolean isGodGiantActive(Entity entity) {
+        return entity instanceof PlayerEntity player && GodPowerHandler.isGiant(player.getUuid());
+    }
+
+    public static boolean isGodTelekinesisActive(Entity entity) {
+        return entity instanceof PlayerEntity player && GodPowerHandler.isTelekinesisHolding(player.getUuid());
     }
 
     public static boolean isWaterWalkingActive(Entity entity) {
@@ -563,6 +585,12 @@ public final class PowerManager {
             }
             if (GodPowerHandler.isNoClipActive(playerUuid)) {
                 flags |= PowerStatusPayload.GOD_NOCLIP_ACTIVE;
+            }
+            if (GodPowerHandler.isGiant(playerUuid)) {
+                flags |= PowerStatusPayload.GOD_GIANT_ACTIVE;
+            }
+            if (GodPowerHandler.isTelekinesisHolding(playerUuid)) {
+                flags |= PowerStatusPayload.GOD_TELEKINESIS_ACTIVE;
             }
         }
         if (equippedPower == Power.ICE && IcePowerHandler.isSnowballPrimed(playerUuid)) {

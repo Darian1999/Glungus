@@ -5,8 +5,10 @@ import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityType;
+import net.minecraft.entity.FallingBlockEntity;
 import net.minecraft.entity.LightningEntity;
 import net.minecraft.entity.LivingEntity;
+import net.minecraft.entity.attribute.EntityAttributes;
 import net.minecraft.entity.mob.MobEntity;
 import net.minecraft.entity.effect.StatusEffect;
 import net.minecraft.entity.effect.StatusEffectInstance;
@@ -76,11 +78,52 @@ final class GodPowerHandler {
     private static final float BANISH_DAMAGE = 25.0F;
     private static final int BANISH_COOLDOWN = 200;
 
+    // ----- KP2 GIANT: 3x size toggle -----
+    private static final float GIANT_SCALE = 3.0F;
+    private static final float NORMAL_SCALE = 1.0F;
+    private static final Set<UUID> GIANT_PLAYERS = new HashSet<>();
+
+    // ----- KP3 TELEKINESIS: grab blocks/mobs and throw -----
+    private static final double TK_RANGE = 32.0D;
+    private static final double TK_HOLD_DISTANCE = 4.0D;
+    private static final double TK_GIANT_HOLD_DISTANCE = 6.5D;
+    private static final double TK_THROW_POWER = 2.8D;
+    private static final Map<UUID, Integer> TK_HELD_ENTITY = new HashMap<>();
+
+    // Thrown blocks that deal hardness-based damage on landing
+    private static final Map<Integer, ThrownBlockInfo> THROWN_BLOCKS = new HashMap<>();
+    private static class ThrownBlockInfo {
+        ServerWorld world;
+        BlockState state;
+        float damage;
+        Vec3d lastPos;
+        UUID owner;
+        ThrownBlockInfo(ServerWorld world, BlockState state, float damage, Vec3d lastPos, UUID owner) {
+            this.world = world; this.state = state; this.damage = damage; this.lastPos = lastPos; this.owner = owner;
+        }
+    }
+
     private static final Set<UUID> GOD_MODE_PLAYERS = new HashSet<>();
     private static final Set<UUID> GOD_NOCLIP_PLAYERS = new HashSet<>();
     private static final Set<UUID> CLIENT_GOD_NOCLIP_PLAYERS = java.util.concurrent.ConcurrentHashMap.newKeySet();
+    private static final Set<UUID> CLIENT_GOD_MODE_PLAYERS = java.util.concurrent.ConcurrentHashMap.newKeySet();
     private static final Set<UUID> ACTIVE_LASERS = new HashSet<>();
     private static final Map<UUID, GameMode> PREVIOUS_GAME_MODES = new HashMap<>();
+    // Pending ascension: player must jump and reach apex before God Mode fully activates
+    private static final Map<UUID, PendingAscension> PENDING_ASCENSION = new HashMap<>();
+
+    private static class PendingAscension {
+        final GameMode previousGameMode;
+        int ticks;
+        boolean hasRisen;
+        double lastVy;
+        PendingAscension(GameMode previousGameMode) {
+            this.previousGameMode = previousGameMode;
+            this.ticks = 0;
+            this.hasRisen = false;
+            this.lastVy = 0.0D;
+        }
+    }
     private static final Map<UUID, Integer> SMITE_COOLDOWNS = new HashMap<>();
     private static final Map<UUID, Integer> ANNIHILATE_COOLDOWNS = new HashMap<>();
     private static final Map<UUID, Integer> NOVA_COOLDOWNS = new HashMap<>();
@@ -103,23 +146,413 @@ final class GodPowerHandler {
             player.sendMessage(Text.literal("God Mode disabled."), true);
             return 1;
         }
+        if (PENDING_ASCENSION.containsKey(playerUuid)) {
+            // Cancel pending ascension
+            PENDING_ASCENSION.remove(playerUuid);
+            PREVIOUS_GAME_MODES.remove(playerUuid);
+            PowerManager.sendPowerStatus(player);
+            player.sendMessage(Text.literal("God Mode ascension cancelled."), true);
+            return 1;
+        }
 
-        PREVIOUS_GAME_MODES.put(playerUuid, player.interactionManager.getGameMode());
+        // Begin ascension: store previous game mode and force a jump; God Mode activates at apex
+        GameMode previous = player.interactionManager.getGameMode();
+        PREVIOUS_GAME_MODES.put(playerUuid, previous);
+        PENDING_ASCENSION.put(playerUuid, new PendingAscension(previous));
+
+        // Force automatic jump
+        ServerWorld world = (ServerWorld) player.getEntityWorld();
+        Vec3d pos = player.getEntityPos();
+        if (player.isOnGround()) {
+            try {
+                player.jump();
+            } catch (Exception ignored) {
+                player.addVelocity(0.0D, 0.42D, 0.0D);
+                player.velocityDirty = true;
+            }
+            // Ensure velocity is sent even if jump was handled via status
+            player.velocityDirty = true;
+        } else {
+            // Airborne: give upward boost
+            Vec3d vel = player.getVelocity();
+            player.setVelocity(vel.x * 0.6D, 0.65D, vel.z * 0.6D);
+            player.velocityDirty = true;
+        }
+        world.spawnParticles(ParticleTypes.WAX_ON, pos.x, pos.y + 0.1D, pos.z, 18, 0.3D, 0.2D, 0.3D, 0.05D);
+        world.playSound(null, pos.x, pos.y, pos.z, SoundEvents.ENTITY_ENDER_DRAGON_FLAP, SoundCategory.PLAYERS, 0.8F, 1.4F);
+        PowerManager.sendPowerStatus(player);
+        player.sendMessage(Text.literal("Ascending to godhood — reach the peak to ascend!"), true);
+        return 1;
+    }
+
+    private static void activateGodModeAtApex(ServerPlayerEntity player) {
+        UUID playerUuid = player.getUuid();
+        if (GOD_MODE_PLAYERS.contains(playerUuid)) {
+            return;
+        }
         GOD_MODE_PLAYERS.add(playerUuid);
+        // PREVIOUS_GAME_MODES already stored at jump initiation
         player.changeGameMode(GameMode.CREATIVE);
-        // God Mode starts without noclip; press backslash (\\) to toggle phasing through walls.
         player.noClip = false;
         player.getAbilities().flying = false;
         player.sendAbilitiesUpdate();
         PowerManager.sendPowerStatus(player);
+        ServerWorld world = (ServerWorld) player.getEntityWorld();
+        Vec3d center = player.getEntityPos().add(0.0D, player.getHeight() * 0.5D, 0.0D);
+        world.spawnParticles(ParticleTypes.TOTEM_OF_UNDYING, center.x, center.y, center.z, 42, 0.6D, 1.0D, 0.6D, 0.2D);
+        world.spawnParticles(ParticleTypes.WAX_ON, center.x, center.y, center.z, 90, 1.0D, 1.2D, 1.0D, 0.06D);
+        world.playSound(null, center.x, center.y, center.z, SoundEvents.BLOCK_BEACON_ACTIVATE, SoundCategory.PLAYERS, 1.4F, 1.15F);
+        world.playSound(null, center.x, center.y, center.z, SoundEvents.ENTITY_EVOKER_CAST_SPELL, SoundCategory.PLAYERS, 1.0F, 1.6F);
         player.sendMessage(Text.literal(
-                "God Mode enabled — KP7 bless, KP8 levitate, KP9 laser, KP0 smite, KP. blast, KPENTER nova, KP* omnipotence, KP/ banish, \\ noclip."
+                "God Mode enabled — KP2 giant, KP3 telekinesis, KP7 bless, KP8 levitate, KP9 laser, KP0 smite, KP. blast, KPENTER nova, KP* omnipotence, KP/ banish, \\ noclip."
         ), true);
+    }
+
+    private static void tickPendingAscension(MinecraftServer server) {
+        if (PENDING_ASCENSION.isEmpty()) {
+            return;
+        }
+        for (UUID uuid : Set.copyOf(PENDING_ASCENSION.keySet())) {
+            PendingAscension pending = PENDING_ASCENSION.get(uuid);
+            if (pending == null) continue;
+            ServerPlayerEntity player = server.getPlayerManager().getPlayer(uuid);
+            if (player == null || !player.isAlive()) {
+                PENDING_ASCENSION.remove(uuid);
+                if (player == null) {
+                    PREVIOUS_GAME_MODES.remove(uuid);
+                }
+                continue;
+            }
+            pending.ticks++;
+            double vy = player.getVelocity().y;
+            if (vy > 0.05D) {
+                pending.hasRisen = true;
+            }
+            boolean atApex = false;
+            if (pending.hasRisen && pending.ticks > 3 && vy <= 0.02D) {
+                atApex = true;
+            }
+            // If player landed after rising, also consider apex reached (e.g., short jump)
+            if (pending.hasRisen && player.isOnGround() && pending.ticks > 8) {
+                atApex = true;
+            }
+            if (atApex) {
+                PENDING_ASCENSION.remove(uuid);
+                activateGodModeAtApex(player);
+                continue;
+            }
+            if (pending.ticks > 80) {
+                // Timeout fallback – activate anyway to avoid soft-lock
+                PENDING_ASCENSION.remove(uuid);
+                activateGodModeAtApex(player);
+                continue;
+            }
+            // Visual trail during ascent
+            if (pending.ticks % 2 == 0 && player.getEntityWorld() instanceof ServerWorld sw) {
+                Vec3d center = player.getEntityPos().add(0.0D, player.getHeight() * 0.5D, 0.0D);
+                sw.spawnParticles(ParticleTypes.END_ROD, center.x, center.y, center.z, 1, 0.18D, 0.18D, 0.18D, 0.01D);
+            }
+            pending.lastVy = vy;
+        }
+    }
+
+    // ----- KP2: Giant toggle -----
+    static int toggleGiant(ServerPlayerEntity player) {
+        UUID uuid = player.getUuid();
+        if (!isActive(uuid)) {
+            return 0;
+        }
+        boolean becomingGiant = !GIANT_PLAYERS.contains(uuid);
+        if (becomingGiant) {
+            GIANT_PLAYERS.add(uuid);
+            var attr = player.getAttributeInstance(EntityAttributes.SCALE);
+            if (attr != null) {
+                attr.setBaseValue(GIANT_SCALE);
+            }
+            try {
+                player.calculateDimensions();
+            } catch (Exception ignored) {}
+            player.sendMessage(Text.literal("GOD GIANT — you are now 3x size! (KP2 to revert)"), true);
+        } else {
+            GIANT_PLAYERS.remove(uuid);
+            var attr = player.getAttributeInstance(EntityAttributes.SCALE);
+            if (attr != null) {
+                attr.setBaseValue(NORMAL_SCALE);
+            }
+            try {
+                player.calculateDimensions();
+            } catch (Exception ignored) {}
+            player.sendMessage(Text.literal("GOD GIANT — returned to normal size."), true);
+        }
+        PowerManager.sendPowerStatus(player);
         return 1;
+    }
+
+    static boolean isGiant(UUID uuid) {
+        return GIANT_PLAYERS.contains(uuid);
+    }
+
+    // ----- KP3: Telekinesis -----
+    static int toggleTelekinesis(ServerPlayerEntity player) {
+        UUID uuid = player.getUuid();
+        if (!isActive(uuid)) {
+            return 0;
+        }
+        ServerWorld world = (ServerWorld) player.getEntityWorld();
+        // If already holding something, throw it
+        if (TK_HELD_ENTITY.containsKey(uuid)) {
+            int entityId = TK_HELD_ENTITY.get(uuid);
+            Entity held = world.getEntityById(entityId);
+            if (held != null) {
+                Vec3d dir = player.getRotationVec(1.0F).normalize();
+                held.setNoGravity(false);
+                held.setVelocity(dir.x * TK_THROW_POWER, dir.y * TK_THROW_POWER + 0.25D, dir.z * TK_THROW_POWER);
+                held.velocityDirty = true;
+                // For living mobs, ensure they take fall/throw damage physics
+                if (held instanceof LivingEntity living) {
+                    living.setVelocity(dir.x * TK_THROW_POWER, dir.y * TK_THROW_POWER + 0.25D, dir.z * TK_THROW_POWER);
+                    living.velocityDirty = true;
+                }
+                // If it's a falling block, register hardness-based impact damage
+                if (held instanceof FallingBlockEntity fbe) {
+                    BlockState fState = fbe.getBlockState();
+                    float hardness = getBlockHardness(fState, world, BlockPos.ofFloored(fbe.getEntityPos()));
+                    if (hardness < 0) hardness = 5.0F;
+                    float damage = Math.max(4.0F, hardness * 2.0F + 4.0F);
+                    // Cap extreme hardness (obsidian 50 -> 104) to avoid absurd one-shots beyond 40+
+                    // but keep scaling: we cap at 36 for balance, still huge
+                    if (damage > 36.0F) damage = 36.0F;
+                    THROWN_BLOCKS.put(fbe.getId(), new ThrownBlockInfo(world, fState, damage, fbe.getEntityPos(), uuid));
+                }
+                world.playSound(null, held.getX(), held.getY(), held.getZ(), SoundEvents.ENTITY_ENDERMAN_TELEPORT, SoundCategory.PLAYERS, 1.2F, 0.8F);
+                world.spawnParticles(ParticleTypes.PORTAL, held.getX(), held.getY() + held.getHeight() * 0.5D, held.getZ(), 20, 0.4D, 0.6D, 0.4D, 0.12D);
+            }
+            TK_HELD_ENTITY.remove(uuid);
+            PowerManager.sendPowerStatus(player);
+            player.sendMessage(Text.literal("Telekinesis — thrown!"), true);
+            return 1;
+        }
+        // Otherwise try to grab
+        Vec3d start = player.getCameraPosVec(1.0F);
+        Vec3d direction = player.getRotationVec(1.0F).normalize();
+        Vec3d maxEnd = start.add(direction.multiply(TK_RANGE));
+        BlockHitResult blockHit = world.raycast(new RaycastContext(start, maxEnd, RaycastContext.ShapeType.COLLIDER, RaycastContext.FluidHandling.NONE, player));
+        Vec3d blockEnd = blockHit.getType() == HitResult.Type.MISS ? maxEnd : blockHit.getPos();
+        EntityHitResult entityHit = ProjectileUtil.raycast(player, start, maxEnd, player.getBoundingBox().stretch(direction.multiply(TK_RANGE)).expand(1.0D), e -> (e instanceof MobEntity mob && mob.isAlive() && !mob.isSpectator()) || (e instanceof LivingEntity le && le.isAlive() && !le.isSpectator() && !(e instanceof ServerPlayerEntity)), TK_RANGE * TK_RANGE);
+        boolean entityCloser = entityHit != null && (blockHit.getType() == HitResult.Type.MISS || entityHit.getPos().squaredDistanceTo(start) <= blockEnd.squaredDistanceTo(start));
+        if (entityCloser) {
+            Entity target = entityHit.getEntity();
+            // Don't allow grabbing other players/creative? allow mobs only per spec
+            if (!(target instanceof MobEntity) && !(target instanceof LivingEntity)) {
+                player.sendMessage(Text.literal("Telekinesis — can only grab mobs and blocks."), true);
+                return 0;
+            }
+            target.setNoGravity(true);
+            target.setVelocity(Vec3d.ZERO);
+            target.velocityDirty = true;
+            TK_HELD_ENTITY.put(uuid, target.getId());
+            Vec3d pos = target.getEntityPos().add(0.0D, target.getHeight() * 0.5D, 0.0D);
+            world.spawnParticles(ParticleTypes.WAX_ON, pos.x, pos.y, pos.z, 30, 0.5D, 0.6D, 0.5D, 0.05D);
+            world.playSound(null, pos.x, pos.y, pos.z, SoundEvents.BLOCK_BEACON_ACTIVATE, SoundCategory.PLAYERS, 1.0F, 1.4F);
+            PowerManager.sendPowerStatus(player);
+            player.sendMessage(Text.literal("Telekinesis — grabbed " + target.getDisplayName().getString() + ". Press KP3 again to throw."), true);
+            return 1;
+        }
+        if (blockHit.getType() == HitResult.Type.BLOCK) {
+            BlockPos hitPos = blockHit.getBlockPos();
+            BlockState state = world.getBlockState(hitPos);
+            if (!isDestructible(state) || state.isAir()) {
+                player.sendMessage(Text.literal("Telekinesis — cannot grab that block."), true);
+                return 0;
+            }
+            // Check chunk loaded
+            if (!world.getChunkManager().isChunkLoaded(hitPos.getX() >> 4, hitPos.getZ() >> 4)) {
+                player.sendMessage(Text.literal("Telekinesis — chunk not loaded."), true);
+                return 0;
+            }
+            // Remove block and spawn falling block entity to hold
+            world.setBlockState(hitPos, Blocks.AIR.getDefaultState(), Block.NOTIFY_ALL);
+            FallingBlockEntity falling = FallingBlockEntity.spawnFromBlock(world, hitPos, state);
+            if (falling == null) {
+                // Fallback: restore block if spawning failed
+                world.setBlockState(hitPos, state, Block.NOTIFY_ALL);
+                player.sendMessage(Text.literal("Telekinesis — failed to grab block."), true);
+                return 0;
+            }
+            falling.setNoGravity(true);
+            falling.setVelocity(Vec3d.ZERO);
+            // Prevent instant drop/conversion
+            falling.timeFalling = 1;
+            TK_HELD_ENTITY.put(uuid, falling.getId());
+            double fx = hitPos.getX() + 0.5D;
+            double fy = hitPos.getY() + 0.5D;
+            double fz = hitPos.getZ() + 0.5D;
+            world.spawnParticles(new BlockStateParticleEffect(ParticleTypes.BLOCK, state), fx, fy, fz, 30, 0.4D, 0.4D, 0.4D, 0.08D);
+            world.playSound(null, fx, fy, fz, SoundEvents.BLOCK_STONE_PLACE, SoundCategory.BLOCKS, 1.0F, 0.8F);
+            PowerManager.sendPowerStatus(player);
+            player.sendMessage(Text.literal("Telekinesis — grabbed block. Press KP3 again to throw."), true);
+            return 1;
+        }
+        player.sendMessage(Text.literal("Telekinesis failed — aim at a mob or block within " + (int) TK_RANGE + " blocks."), true);
+        return 0;
+    }
+
+    static boolean isTelekinesisHolding(UUID uuid) {
+        return TK_HELD_ENTITY.containsKey(uuid);
+    }
+
+    private static void tickTelekinesis(MinecraftServer server) {
+        for (UUID uuid : Set.copyOf(TK_HELD_ENTITY.keySet())) {
+            ServerPlayerEntity player = server.getPlayerManager().getPlayer(uuid);
+            Integer entityId = TK_HELD_ENTITY.get(uuid);
+            ServerWorld world = null;
+            if (player != null && player.getEntityWorld() instanceof ServerWorld sw) {
+                world = sw;
+            }
+            if (player == null || !isActive(uuid) || entityId == null || world == null) {
+                // Drop without throw
+                if (entityId != null && world != null) {
+                    Entity e = world.getEntityById(entityId);
+                    if (e != null) e.setNoGravity(false);
+                } else if (entityId != null && player != null && player.getEntityWorld() instanceof ServerWorld sw2) {
+                    Entity e = sw2.getEntityById(entityId);
+                    if (e != null) e.setNoGravity(false);
+                }
+                TK_HELD_ENTITY.remove(uuid);
+                if (player != null) PowerManager.sendPowerStatus(player);
+                continue;
+            }
+            Entity held = world.getEntityById(entityId);
+            if (held == null || !held.isAlive() || held.isRemoved()) {
+                TK_HELD_ENTITY.remove(uuid);
+                PowerManager.sendPowerStatus(player);
+                continue;
+            }
+            // Update hold position in front of player
+            Vec3d eye = player.getCameraPosVec(1.0F);
+            Vec3d dir = player.getRotationVec(1.0F).normalize();
+            double dist = GIANT_PLAYERS.contains(uuid) ? TK_GIANT_HOLD_DISTANCE : TK_HOLD_DISTANCE;
+            Vec3d target = eye.add(dir.multiply(dist));
+            // Offset so entity center is at target; for blocks/mobs the pos is feet
+            double yOffset = held.getHeight() * 0.5D;
+            // Keep entity at target height centered
+            double tx = target.x;
+            double ty = target.y - yOffset;
+            double tz = target.z;
+            // Teleport / set position
+            held.setPosition(tx, ty, tz);
+            held.setVelocity(Vec3d.ZERO);
+            held.velocityDirty = true;
+            held.setNoGravity(true);
+            // Visual particles
+            if (world.getTime() % 4 == 0) {
+                world.spawnParticles(ParticleTypes.WAX_ON, held.getX(), held.getY() + held.getHeight() * 0.5D, held.getZ(), 1, 0.15D, 0.15D, 0.15D, 0.01D);
+            }
+            // Prevent falling block from landing while held
+            if (held instanceof FallingBlockEntity fbe) {
+                fbe.timeFalling = 1;
+            }
+        }
+    }
+
+    private static float getBlockHardness(BlockState state, ServerWorld world, BlockPos pos) {
+        try {
+            return state.getHardness(world, pos);
+        } catch (Throwable t) {
+            return 1.5F;
+        }
+    }
+
+    private static void tickThrownBlocks(MinecraftServer server) {
+        if (THROWN_BLOCKS.isEmpty()) return;
+        for (Integer id : Set.copyOf(THROWN_BLOCKS.keySet())) {
+            ThrownBlockInfo info = THROWN_BLOCKS.get(id);
+            if (info == null) continue;
+            ServerWorld world = info.world;
+            Entity entity = world.getEntityById(id);
+            if (entity == null || entity.isRemoved() || !entity.isAlive()) {
+                // Consider landed at last known pos
+                Vec3d impact = info.lastPos != null ? info.lastPos : new Vec3d(0, 64, 0);
+                // Try to get actual block pos from lastPos
+                applyBlockImpact(world, info.state, info.damage, impact, info.owner);
+                THROWN_BLOCKS.remove(id);
+                continue;
+            }
+            // Update last known pos
+            info.lastPos = entity.getEntityPos();
+            // Detect landing: falling block on ground or velocity near zero after falling
+            boolean onGround = entity.isOnGround();
+            boolean velNearZero = entity.getVelocity().lengthSquared() < 0.02D;
+            // For FallingBlockEntity, timeFalling > 5 and onGround indicates impact
+            if (entity instanceof FallingBlockEntity fbe) {
+                if (fbe.isOnGround() || (onGround && fbe.timeFalling > 3)) {
+                    Vec3d impact = entity.getEntityPos();
+                    applyBlockImpact(world, info.state, info.damage, impact, info.owner);
+                    // Let vanilla place the block; we just dealt damage
+                    THROWN_BLOCKS.remove(id);
+                    // Give it a little bounce prevention: ensure it lands
+                    continue;
+                }
+                // Also if fallen and now has very low velocity for a few ticks
+                if (velNearZero && fbe.timeFalling > 20) {
+                    Vec3d impact = entity.getEntityPos();
+                    applyBlockImpact(world, info.state, info.damage, impact, info.owner);
+                    THROWN_BLOCKS.remove(id);
+                }
+            } else if (onGround && velNearZero) {
+                Vec3d impact = entity.getEntityPos();
+                applyBlockImpact(world, info.state, info.damage, impact, info.owner);
+                THROWN_BLOCKS.remove(id);
+            }
+            // Timeout: if falling for > 10 seconds without landing, clean up
+            if (entity.age > 200) {
+                THROWN_BLOCKS.remove(id);
+            }
+        }
+    }
+
+    private static void applyBlockImpact(ServerWorld world, BlockState state, float damage, Vec3d impactPos, UUID ownerUuid) {
+        // Radius scales slightly with hardness/damage: base 2.5 + damage*0.05
+        double radius = 2.5D + (damage * 0.04D);
+        if (radius > 5.0D) radius = 5.0D;
+        Box box = new Box(impactPos.x - radius, impactPos.y - radius, impactPos.z - radius,
+                impactPos.x + radius, impactPos.y + radius, impactPos.z + radius);
+        ServerPlayerEntity owner = ownerUuid != null ? world.getServer().getPlayerManager().getPlayer(ownerUuid) : null;
+        List<Entity> targets = world.getOtherEntities(null, box, e -> e instanceof LivingEntity le && le.isAlive() && !le.isSpectator() && (owner == null || !e.getUuid().equals(ownerUuid)));
+        int hit = 0;
+        for (Entity e : targets) {
+            if (e.squaredDistanceTo(impactPos) > radius * radius) continue;
+            LivingEntity le = (LivingEntity) e;
+            // Damage source: player attack if owner exists, else generic magic/falling
+            if (owner != null) {
+                le.damage(world, world.getDamageSources().playerAttack(owner), damage);
+            } else {
+                le.damage(world, world.getDamageSources().magic(), damage);
+            }
+            // Knockback away from impact
+            Vec3d away = e.getEntityPos().subtract(impactPos).normalize();
+            if (away.lengthSquared() > 0.001D) {
+                double kb = 0.6D + damage * 0.02D;
+                e.addVelocity(away.x * kb, 0.35D + damage * 0.01D, away.z * kb);
+                e.velocityDirty = true;
+            }
+            hit++;
+        }
+        if (hit > 0 || true) {
+            // Impact effects even without hit
+            world.spawnParticles(new BlockStateParticleEffect(ParticleTypes.BLOCK, state), impactPos.x, impactPos.y + 0.5D, impactPos.z, 40, radius * 0.5D, 0.6D, radius * 0.5D, 0.12D);
+            world.spawnParticles(ParticleTypes.POOF, impactPos.x, impactPos.y + 0.2D, impactPos.z, 12, 0.5D, 0.3D, 0.5D, 0.08D);
+            world.playSound(null, impactPos.x, impactPos.y, impactPos.z, SoundEvents.BLOCK_STONE_BREAK, SoundCategory.BLOCKS, 1.2F, 0.7F);
+            world.playSound(null, impactPos.x, impactPos.y, impactPos.z, SoundEvents.ENTITY_GENERIC_EXPLODE, SoundCategory.PLAYERS, 0.8F, 0.9F);
+        }
     }
 
     static boolean isActive(UUID playerUuid) {
         return GOD_MODE_PLAYERS.contains(playerUuid);
+    }
+
+    static boolean isPending(UUID playerUuid) {
+        return PENDING_ASCENSION.containsKey(playerUuid);
     }
 
     static boolean isNoClipActive(UUID playerUuid) {
@@ -135,6 +568,18 @@ final class GodPowerHandler {
             CLIENT_GOD_NOCLIP_PLAYERS.add(playerUuid);
         } else {
             CLIENT_GOD_NOCLIP_PLAYERS.remove(playerUuid);
+        }
+    }
+
+    static boolean isClientGodModeActive(UUID playerUuid) {
+        return CLIENT_GOD_MODE_PLAYERS.contains(playerUuid);
+    }
+
+    static void setClientGodModeActive(UUID playerUuid, boolean active) {
+        if (active) {
+            CLIENT_GOD_MODE_PLAYERS.add(playerUuid);
+        } else {
+            CLIENT_GOD_MODE_PLAYERS.remove(playerUuid);
         }
     }
 
@@ -246,7 +691,10 @@ final class GodPowerHandler {
     }
 
     static void tickServer(MinecraftServer server) {
+        tickPendingAscension(server);
         tickCooldowns();
+        tickTelekinesis(server);
+        tickThrownBlocks(server);
         for (UUID playerUuid : Set.copyOf(ACTIVE_LASERS)) {
             ServerPlayerEntity player = server.getPlayerManager().getPlayer(playerUuid);
             if (player == null || !isActive(playerUuid) || !(player.getEntityWorld() instanceof ServerWorld world)) {
@@ -866,7 +1314,29 @@ final class GodPowerHandler {
         GOD_MODE_PLAYERS.remove(playerUuid);
         GOD_NOCLIP_PLAYERS.remove(playerUuid);
         CLIENT_GOD_NOCLIP_PLAYERS.remove(playerUuid);
+        CLIENT_GOD_MODE_PLAYERS.remove(playerUuid);
+        PENDING_ASCENSION.remove(playerUuid);
         OMNIPOTENCE_TICKS.remove(playerUuid);
+        // Restore normal size if giant
+        if (GIANT_PLAYERS.remove(playerUuid)) {
+            var attr = player.getAttributeInstance(EntityAttributes.SCALE);
+            if (attr != null) {
+                attr.setBaseValue(NORMAL_SCALE);
+            }
+            try { player.calculateDimensions(); } catch (Exception ignored) {}
+        }
+        // Release telekinesis hold without throw
+        Integer heldId = TK_HELD_ENTITY.remove(playerUuid);
+        if (heldId != null && player.getEntityWorld() instanceof ServerWorld world) {
+            Entity held = world.getEntityById(heldId);
+            if (held != null) {
+                held.setNoGravity(false);
+                held.velocityDirty = true;
+                if (held instanceof FallingBlockEntity fbe) {
+                    fbe.timeFalling = 1;
+                }
+            }
+        }
         // HACKY LIGHT cleanup: remove the fake Night Vision we applied; no block to remove.
         player.removeStatusEffect(StatusEffects.NIGHT_VISION);
         GameMode previousGameMode = PREVIOUS_GAME_MODES.remove(playerUuid);
@@ -874,6 +1344,7 @@ final class GodPowerHandler {
             player.changeGameMode(previousGameMode);
         }
         player.noClip = false;
+        PowerManager.sendPowerStatus(player);
     }
 
     static void removePlayer(ServerPlayerEntity player) {
@@ -889,12 +1360,27 @@ final class GodPowerHandler {
         OMNIPOTENCE_TICKS.remove(playerUuid);
         GOD_NOCLIP_PLAYERS.remove(playerUuid);
         CLIENT_GOD_NOCLIP_PLAYERS.remove(playerUuid);
+        CLIENT_GOD_MODE_PLAYERS.remove(playerUuid);
+        PENDING_ASCENSION.remove(playerUuid);
+        PREVIOUS_GAME_MODES.remove(playerUuid);
+        GIANT_PLAYERS.remove(playerUuid);
+        TK_HELD_ENTITY.remove(playerUuid);
+        // Clean up any thrown blocks owned by this player (they will still land and deal damage, but we keep tracking for damage)
+        // We keep them in THROWN_BLOCKS until they land, so do not remove here; just allow them to still impact.
+        // If we want to cancel, uncomment: THROWN_BLOCKS.entrySet().removeIf(e -> e.getValue().owner.equals(playerUuid));
+        var attr = player.getAttributeInstance(EntityAttributes.SCALE);
+        if (attr != null && attr.getBaseValue() != NORMAL_SCALE) {
+            attr.setBaseValue(NORMAL_SCALE);
+            try { player.calculateDimensions(); } catch (Exception ignored) {}
+        }
     }
 
     static void clearAll() {
         GOD_MODE_PLAYERS.clear();
         GOD_NOCLIP_PLAYERS.clear();
         CLIENT_GOD_NOCLIP_PLAYERS.clear();
+        CLIENT_GOD_MODE_PLAYERS.clear();
+        PENDING_ASCENSION.clear();
         ACTIVE_LASERS.clear();
         PREVIOUS_GAME_MODES.clear();
         SMITE_COOLDOWNS.clear();
@@ -905,5 +1391,8 @@ final class GodPowerHandler {
         BLESS_COOLDOWNS.clear();
         LEVITATE_COOLDOWNS.clear();
         OMNIPOTENCE_TICKS.clear();
+        GIANT_PLAYERS.clear();
+        TK_HELD_ENTITY.clear();
+        THROWN_BLOCKS.clear();
     }
 }
