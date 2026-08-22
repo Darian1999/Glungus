@@ -1,0 +1,75 @@
+{
+  "title": "FIRE PROTOCOL",
+  "subtitle": "PYROBORN LOADOUT  //  ONLINE",
+  "footer": {
+    "hint": "KEYPAD 1 TO BURN  •  KEYPAD 2 FOR IMMUNITY  •  KEYPAD 3 x2",
+    "prompt": "DOUBLE-TAP DETECTED  //  STRIKE NOW"
+  },
+  "accent": "0xFFFF5A1F",
+  "palette": {
+    "panelBackground": "0xCC1E0906",
+    "headerBand": "0xCC2B0F07",
+    "divider": "0xFF8A2C10",
+    "cardBackground": "0xC4420F08",
+    "cardCooldownBackground": "0xC4531A0B",
+    "keyBackground": "0xFF3A1408",
+    "keyText": "0xFFFFD9A8",
+    "barBackground": "0xFF5C2610",
+    "primaryText": "0xFFFFD9A8",
+    "subtitleText": "0xFFFFA64D",
+    "cardSubtitleText": "0xFFE08A55",
+    "dimText": "0xFFC97A4E",
+    "readyText": "0xFFFFC93C",
+    "cooldownText": "0xFFFF8C42",
+    "primedText": "0xFFFF5A1F"
+  },
+  "decorations": [
+    {
+      "right": 28,
+      "y": 9,
+      "width": 8,
+      "height": 2,
+      "color": "0x66FF7A2E"
+    },
+    {
+      "right": 16,
+      "y": 15,
+      "width": 10,
+      "height": 2,
+      "color": "0x33FF5A1F"
+    },
+    {
+      "right": 30,
+      "y": 21,
+      "width": 12,
+      "height": 2,
+      "color": "0x33FF5A1F"
+    }
+  ],
+  "cards": [
+    {
+      "key": "KP1",
+      "title": "FLAMETHROWER",
+      "subtitle": "10 BLOCKS",
+      "maxCooldown": 100,
+      "primedText": "BURNING",
+      "accent": "0xFFFF5A1F"
+    },
+    {
+      "key": "KP2",
+      "title": "FIRE IMMUNITY",
+      "subtitle": "TOGGLE",
+      "maxCooldown": 1,
+      "primedText": "ACTIVE",
+      "accent": "0xFFFFA500"
+    },
+    {
+      "key": "KP3 x2",
+      "title": "RING OF FIRE",
+      "subtitle": "MASSIVE RING",
+      "maxCooldown": 600,
+      "primedText": "PRESS AGAIN",
+      "accent": "0xFFE8451C"
+    }
+  ]
+}

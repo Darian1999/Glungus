@@ -1,0 +1,75 @@
+{
+  "title": "WATER PROTOCOL",
+  "subtitle": "TIDEBORN LOADOUT  //  JESUS WALK ACTIVE",
+  "footer": {
+    "hint": "KEYPAD 1 FOR CANNON  •  KEYPAD 2 NEAR OCEAN  •  KEYPAD 3 x2  •  SHIFT TO SWIM",
+    "prompt": "DOUBLE-TAP DETECTED  //  METEOR INBOUND"
+  },
+  "accent": "0xFF28B9E6",
+  "palette": {
+    "panelBackground": "0xCC061B2A",
+    "headerBand": "0xCC092C40",
+    "divider": "0xFF17617D",
+    "cardBackground": "0xC4103B52",
+    "cardCooldownBackground": "0xC41B3040",
+    "keyBackground": "0xFF12617D",
+    "keyText": "0xFFE2FBFF",
+    "barBackground": "0xFF17455A",
+    "primaryText": "0xFFE2FBFF",
+    "subtitleText": "0xFF76DDF5",
+    "cardSubtitleText": "0xFF7BC5D8",
+    "dimText": "0xFF6EA5B7",
+    "readyText": "0xFF9CFFD4",
+    "cooldownText": "0xFFFFCF75",
+    "primedText": "0xFF52E6FF"
+  },
+  "decorations": [
+    {
+      "right": 12,
+      "y": 9,
+      "width": 26,
+      "height": 2,
+      "color": "0x99A9F5FF"
+    },
+    {
+      "right": 18,
+      "y": 15,
+      "width": 16,
+      "height": 2,
+      "color": "0x66A9F5FF"
+    },
+    {
+      "right": 24,
+      "y": 21,
+      "width": 22,
+      "height": 2,
+      "color": "0x66A9F5FF"
+    }
+  ],
+  "cards": [
+    {
+      "key": "KP1",
+      "title": "WATER CANNON",
+      "subtitle": "FLOODING CRATER",
+      "maxCooldown": 300,
+      "primedText": "FIRING",
+      "accent": "0xFF28B9E6"
+    },
+    {
+      "key": "KP2",
+      "title": "TIDAL WAVE",
+      "subtitle": "OCEAN / 8 BLOCKS",
+      "maxCooldown": 400,
+      "primedText": "SURGING",
+      "accent": "0xFF55D9F4"
+    },
+    {
+      "key": "KP3 x2",
+      "title": "WATER METEOR",
+      "subtitle": "MASSIVE CRATER",
+      "maxCooldown": 1200,
+      "primedText": "PRESS AGAIN",
+      "accent": "0xFFB3F5FF"
+    }
+  ]
+}

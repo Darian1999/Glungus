@@ -1,0 +1,75 @@
+{
+  "title": "SKY PROTOCOL",
+  "subtitle": "SKYBORN LOADOUT  //  ONLINE",
+  "footer": {
+    "hint": "KEYPAD 1 TO FLY  •  KEYPAD 2 FOR WIND  •  KEYPAD 3 x2",
+    "prompt": "DOUBLE-TAP DETECTED  //  STRIKE NOW"
+  },
+  "accent": "0xFF2F8FD8",
+  "palette": {
+    "panelBackground": "0xF28FC4EE",
+    "headerBand": "0xFFAFD7F2",
+    "divider": "0xFF7FB4DC",
+    "cardBackground": "0xF8F5FBFF",
+    "cardCooldownBackground": "0xF8D6E8F5",
+    "keyBackground": "0xFF9CC9E8",
+    "keyText": "0xFF0A2C48",
+    "barBackground": "0xFFBFDCEE",
+    "primaryText": "0xFF0A2C48",
+    "subtitleText": "0xFF175A8F",
+    "cardSubtitleText": "0xFF35729F",
+    "dimText": "0xFF35729F",
+    "readyText": "0xFF1E8A4C",
+    "cooldownText": "0xFFC07A00",
+    "primedText": "0xFF0E6FC0"
+  },
+  "decorations": [
+    {
+      "right": 12,
+      "y": 9,
+      "width": 28,
+      "height": 2,
+      "color": "0x99FFFFFF"
+    },
+    {
+      "right": 16,
+      "y": 15,
+      "width": 16,
+      "height": 2,
+      "color": "0x66FFFFFF"
+    },
+    {
+      "right": 24,
+      "y": 21,
+      "width": 20,
+      "height": 2,
+      "color": "0x66FFFFFF"
+    }
+  ],
+  "cards": [
+    {
+      "key": "KP1",
+      "title": "AIRBORNE",
+      "subtitle": "15% LIGHTER",
+      "maxCooldown": 1,
+      "primedText": "ACTIVE",
+      "accent": "0xFF2F8FD8"
+    },
+    {
+      "key": "KP2",
+      "title": "WIND BURST",
+      "subtitle": "CONE PUSH",
+      "maxCooldown": 60,
+      "primedText": "ARMED",
+      "accent": "0xFF8FD4F0"
+    },
+    {
+      "key": "KP3 x2",
+      "title": "TORNADO",
+      "subtitle": "HEAVY IMPACT",
+      "maxCooldown": 600,
+      "primedText": "PRESS AGAIN",
+      "accent": "0xFF2F66C4"
+    }
+  ]
+}

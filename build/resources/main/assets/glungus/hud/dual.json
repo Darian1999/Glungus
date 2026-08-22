@@ -1,0 +1,28 @@
+{
+  "title": "DUAL PROTOCOL",
+  "subtitle": "TWO POWERSETS ACTIVE",
+  "footer": {
+    "hint": "KEYPAD 1-3 = SLOT 1  •  KEYPAD 4-6 = SLOT 2",
+    "prompt": "DOUBLE-TAP DETECTED  //  STRIKE NOW"
+  },
+  "accent": "0xFF8DEBFF",
+  "palette": {
+    "panelBackground": "0xCC0A0F1A",
+    "headerBand": "0xCC0A0F1A",
+    "divider": "0xFF1E2A3D",
+    "cardBackground": "0xC4141D2C",
+    "cardCooldownBackground": "0xC41A2028",
+    "keyBackground": "0xFF22303F",
+    "keyText": "0xFFE7FCFF",
+    "barBackground": "0xFF1F2B36",
+    "primaryText": "0xFFE7FCFF",
+    "subtitleText": "0xFF7FA8C0",
+    "cardSubtitleText": "0xFF7FA8C0",
+    "dimText": "0xFF6B8296",
+    "readyText": "0xFF9CFFD4",
+    "cooldownText": "0xFFFFC875",
+    "primedText": "0xFF8DEBFF"
+  },
+  "decorations": [],
+  "cards": []
+}

@@ -1,0 +1,75 @@
+{
+  "title": "NATURE PROTOCOL",
+  "subtitle": "WILDBORN LOADOUT  //  ONLINE",
+  "footer": {
+    "hint": "KP1 FLOWER TRAIL  •  KP2 VINE RING  •  KP3 x2 EARTHQUAKE",
+    "prompt": "DOUBLE-TAP DETECTED  //  THE GROUND REBELS"
+  },
+  "accent": "0xFF3FBF5A",
+  "palette": {
+    "panelBackground": "0xCC08170C",
+    "headerBand": "0xCC0E2414",
+    "divider": "0xFF2C6B3A",
+    "cardBackground": "0xC4173A20",
+    "cardCooldownBackground": "0xC4122A1B",
+    "keyBackground": "0xFF1E5C2C",
+    "keyText": "0xFFDFF7E3",
+    "barBackground": "0xFF1F4A29",
+    "primaryText": "0xFFDFF7E3",
+    "subtitleText": "0xFF7BD98E",
+    "cardSubtitleText": "0xFF7FBD8C",
+    "dimText": "0xFF6FA07B",
+    "readyText": "0xFF9CFFD4",
+    "cooldownText": "0xFFFFCF75",
+    "primedText": "0xFF8FFF9F"
+  },
+  "decorations": [
+    {
+      "right": 12,
+      "y": 9,
+      "width": 26,
+      "height": 2,
+      "color": "0x995FE87F"
+    },
+    {
+      "right": 18,
+      "y": 15,
+      "width": 16,
+      "height": 2,
+      "color": "0x665FE87F"
+    },
+    {
+      "right": 24,
+      "y": 21,
+      "width": 22,
+      "height": 2,
+      "color": "0x665FE87F"
+    }
+  ],
+  "cards": [
+    {
+      "key": "KP1",
+      "title": "FLOWER TRAIL",
+      "subtitle": "TOGGLE  •  2 HEARTS/S",
+      "maxCooldown": 1,
+      "primedText": "BLOOMING",
+      "accent": "0xFF3FBF5A"
+    },
+    {
+      "key": "KP2",
+      "title": "VINE RING",
+      "subtitle": "30S SPIN  •  PUSH + HURT",
+      "maxCooldown": 600,
+      "primedText": "SPINNING",
+      "accent": "0xFF6FDC86"
+    },
+    {
+      "key": "KP3 x2",
+      "title": "EARTHQUAKE",
+      "subtitle": "OF LUCIFER  •  60S  •  150S CD",
+      "maxCooldown": 3000,
+      "primedText": "PRESS AGAIN",
+      "accent": "0xFFE8562A"
+    }
+  ]
+}

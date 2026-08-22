@@ -1,0 +1,16 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "org.xiaojian999.superpowers.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "BlockItemMixin",
+    "LivingEntityMixin",
+    "PlayerEntityMixin",
+    "ShulkerBoxBlockEntityMixin",
+    "SnowballEntityMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
