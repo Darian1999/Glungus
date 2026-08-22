@@ -132,6 +132,10 @@ public class GlungusClient implements ClientModInitializer {
 
     @Override
     public void onInitializeClient() {
+        // Explicitly ban https://modrinth.com/mod/wegui — crashes instantly if detected
+        if (net.fabricmc.loader.api.FabricLoader.getInstance().isModLoaded("wegui")) {
+            throw new RuntimeException("listen to the readme, don't use that one chinese worldedit mod");
+        }
         EntityRendererFactories.register(ModEntities.BIG_LIGHTNING, BigLightningEntityRenderer::new);
         IceHud.initialize();
         AirHud.initialize();

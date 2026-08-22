@@ -14,6 +14,10 @@ public class Glungus implements ModInitializer {
 
     @Override
     public void onInitialize() {
+        // Explicitly ban https://modrinth.com/mod/wegui — see README "do not use glungus with these mods"
+        if (FabricLoader.getInstance().isModLoaded("wegui")) {
+            throw new RuntimeException("listen to the readme, don't use that one chinese worldedit mod");
+        }
         ModEntities.register();
         // Auto-generates and registers all C2S/S2C payloads if necessary.
         // - Annotation-driven (@AutoPayload) and reflection-based convention (ID+CODEC)
