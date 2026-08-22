@@ -1,0 +1,41 @@
+# Gradle
+.gradle/
+build/
+out/
+
+# Fabric Loom
+remappedSrc/
+loom-cache/
+
+# IntelliJ IDEA
+.idea/*
+!.idea/.gitignore
+!.idea/modules.xml
+!.idea/*.iml
+*.iml
+*.ipr
+*.iws
+
+# Eclipse
+.classpath
+.project
+.settings/
+bin/
+
+# VS Code
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Minecraft run directory
+run/
+
+# Logs
+logs/
+hs_err_pid*
+replay_*.log
+
+# Misc
+.freebuff/
