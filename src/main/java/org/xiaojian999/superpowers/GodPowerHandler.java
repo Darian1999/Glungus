@@ -42,7 +42,7 @@ import java.util.UUID;
 /** The God powerset: creative godhood, instant kills, a held laser, and blessings. */
 final class GodPowerHandler {
     private static final int LASER_RANGE = 100;
-    private static final double LASER_KILL_RADIUS = 20.0D;
+    private static final double LASER_KILL_RADIUS = 1.0D;
     private static final double LASER_BLOCK_RADIUS = 1.0D;
     private static final double BLESS_RANGE = 32.0D;
     private static final int BLESS_DURATION = 1200;
@@ -117,11 +117,17 @@ final class GodPowerHandler {
         int ticks;
         boolean hasRisen;
         double lastVy;
+        double startY;
+        double prevY;
+        double maxY;
         PendingAscension(GameMode previousGameMode) {
             this.previousGameMode = previousGameMode;
             this.ticks = 0;
             this.hasRisen = false;
             this.lastVy = 0.0D;
+            this.startY = 0.0D;
+            this.prevY = 0.0D;
+            this.maxY = 0.0D;
         }
     }
     private static final Map<UUID, Integer> SMITE_COOLDOWNS = new HashMap<>();
@@ -160,23 +166,36 @@ final class GodPowerHandler {
         PREVIOUS_GAME_MODES.put(playerUuid, previous);
         PENDING_ASCENSION.put(playerUuid, new PendingAscension(previous));
 
-        // Force automatic jump
+        // Force automatic jump – set velocity directly and sync to client via EntityVelocityUpdateS2CPacket
         ServerWorld world = (ServerWorld) player.getEntityWorld();
         Vec3d pos = player.getEntityPos();
-        if (player.isOnGround()) {
+        Vec3d currentVel = player.getVelocity();
+        // Consistent strong jump regardless of ground state; ensures visible apex even for creative/flying players
+        double jumpVelocity = 0.92D;
+        // Include jump boost if active
+        var jumpEffect = player.getStatusEffect(StatusEffects.JUMP_BOOST);
+        if (jumpEffect != null) {
+            jumpVelocity += (jumpEffect.getAmplifier() + 1) * 0.1D;
+        }
+        // Preserve horizontal motion but damp slightly so jump is mostly vertical
+        player.setVelocity(currentVel.x * 0.35D, jumpVelocity, currentVel.z * 0.35D);
+        player.velocityDirty = true;
+        // Ensure gravity applies – temporarily disable creative flight during ascension
+        boolean wasFlying = player.getAbilities().flying;
+        player.getAbilities().flying = false;
+        // Keep allowFlying as previous permits, but not actively flying
+        player.sendAbilitiesUpdate();
+        // Force sync to client immediately (velocityDirty alone is not enough for ServerPlayerEntity)
+        try {
+            player.networkHandler.sendPacket(new net.minecraft.network.packet.s2c.play.EntityVelocityUpdateS2CPacket(player));
+        } catch (Exception ignored) {}
+        // Also force client-side jump animation/status
+        player.setOnGround(false);
+        if (wasFlying) {
+            // Impulse was larger, ensure client also sees vertical motion even if it was flying
             try {
-                player.jump();
-            } catch (Exception ignored) {
-                player.addVelocity(0.0D, 0.42D, 0.0D);
-                player.velocityDirty = true;
-            }
-            // Ensure velocity is sent even if jump was handled via status
-            player.velocityDirty = true;
-        } else {
-            // Airborne: give upward boost
-            Vec3d vel = player.getVelocity();
-            player.setVelocity(vel.x * 0.6D, 0.65D, vel.z * 0.6D);
-            player.velocityDirty = true;
+                player.networkHandler.sendPacket(new net.minecraft.network.packet.s2c.play.EntityVelocityUpdateS2CPacket(player));
+            } catch (Exception ignored2) {}
         }
         world.spawnParticles(ParticleTypes.WAX_ON, pos.x, pos.y + 0.1D, pos.z, 18, 0.3D, 0.2D, 0.3D, 0.05D);
         world.playSound(null, pos.x, pos.y, pos.z, SoundEvents.ENTITY_ENDER_DRAGON_FLAP, SoundCategory.PLAYERS, 0.8F, 1.4F);
@@ -194,7 +213,15 @@ final class GodPowerHandler {
         // PREVIOUS_GAME_MODES already stored at jump initiation
         player.changeGameMode(GameMode.CREATIVE);
         player.noClip = false;
-        player.getAbilities().flying = false;
+        player.fallDistance = 0.0F;
+        // Stop vertical fall at apex for a clean hover and automatically start flying
+        player.setVelocity(0.0D, 0.05D, 0.0D);
+        player.velocityDirty = true;
+        try {
+            player.networkHandler.sendPacket(new net.minecraft.network.packet.s2c.play.EntityVelocityUpdateS2CPacket(player));
+        } catch (Exception ignored) {}
+        player.getAbilities().allowFlying = true;
+        player.getAbilities().flying = true;
         player.sendAbilitiesUpdate();
         PowerManager.sendPowerStatus(player);
         ServerWorld world = (ServerWorld) player.getEntityWorld();
@@ -225,11 +252,25 @@ final class GodPowerHandler {
             }
             pending.ticks++;
             double vy = player.getVelocity().y;
-            if (vy > 0.05D) {
+            double y = player.getY();
+            if (pending.ticks == 1) {
+                pending.startY = y;
+                pending.prevY = y;
+                pending.maxY = y;
+            }
+            if (y > pending.maxY) {
+                pending.maxY = y;
+            }
+            if (vy > 0.05D || y > pending.startY + 0.15D) {
                 pending.hasRisen = true;
             }
             boolean atApex = false;
-            if (pending.hasRisen && pending.ticks > 3 && vy <= 0.02D) {
+            // Apex when upward motion stops: velocity near zero or Y starts decreasing after having risen
+            if (pending.hasRisen && pending.ticks > 3 && (vy <= 0.03D || y <= pending.prevY - 0.01D)) {
+                atApex = true;
+            }
+            // Fallback: if max height reached and now descending (Y at least 0.2 above start but decreasing)
+            if (pending.hasRisen && pending.ticks > 6 && y < pending.maxY - 0.02D && pending.maxY > pending.startY + 0.4D) {
                 atApex = true;
             }
             // If player landed after rising, also consider apex reached (e.g., short jump)
@@ -241,7 +282,7 @@ final class GodPowerHandler {
                 activateGodModeAtApex(player);
                 continue;
             }
-            if (pending.ticks > 80) {
+            if (pending.ticks > 60) {
                 // Timeout fallback – activate anyway to avoid soft-lock
                 PENDING_ASCENSION.remove(uuid);
                 activateGodModeAtApex(player);
@@ -253,6 +294,7 @@ final class GodPowerHandler {
                 sw.spawnParticles(ParticleTypes.END_ROD, center.x, center.y, center.z, 1, 0.18D, 0.18D, 0.18D, 0.01D);
             }
             pending.lastVy = vy;
+            pending.prevY = y;
         }
     }
 
@@ -314,14 +356,14 @@ final class GodPowerHandler {
                     living.velocityDirty = true;
                 }
                 // If it's a falling block, register hardness-based impact damage
+                // Scaled to 3 hearts (6 dmg) minimum, 25 hearts (50 dmg) maximum
                 if (held instanceof FallingBlockEntity fbe) {
                     BlockState fState = fbe.getBlockState();
                     float hardness = getBlockHardness(fState, world, BlockPos.ofFloored(fbe.getEntityPos()));
                     if (hardness < 0) hardness = 5.0F;
-                    float damage = Math.max(4.0F, hardness * 2.0F + 4.0F);
-                    // Cap extreme hardness (obsidian 50 -> 104) to avoid absurd one-shots beyond 40+
-                    // but keep scaling: we cap at 36 for balance, still huge
-                    if (damage > 36.0F) damage = 36.0F;
+                    float damage = hardness * 2.0F + 4.0F;
+                    if (damage < 6.0F) damage = 6.0F; // 3 hearts minimum
+                    if (damage > 50.0F) damage = 50.0F; // 25 hearts maximum (50 health)
                     THROWN_BLOCKS.put(fbe.getId(), new ThrownBlockInfo(world, fState, damage, fbe.getEntityPos(), uuid));
                 }
                 world.playSound(null, held.getX(), held.getY(), held.getZ(), SoundEvents.ENTITY_ENDERMAN_TELEPORT, SoundCategory.PLAYERS, 1.2F, 0.8F);
@@ -523,12 +565,11 @@ final class GodPowerHandler {
         for (Entity e : targets) {
             if (e.squaredDistanceTo(impactPos) > radius * radius) continue;
             LivingEntity le = (LivingEntity) e;
-            // Damage source: player attack if owner exists, else generic magic/falling
-            if (owner != null) {
-                le.damage(world, world.getDamageSources().playerAttack(owner), damage);
-            } else {
-                le.damage(world, world.getDamageSources().magic(), damage);
-            }
+            // Use magic damage for telekinesis impacts so God Mode's instant-kill melee handler
+            // (LivingEntityMixin: playerAttack with God attacker => setHealth(0)) does not
+            // one-shot wardens with soft blocks like grass. Damage is already hardness-scaled
+            // (6 = 3 hearts min, 50 = 25 hearts max).
+            le.damage(world, world.getDamageSources().magic(), damage);
             // Knockback away from impact
             Vec3d away = e.getEntityPos().subtract(impactPos).normalize();
             if (away.lengthSquared() > 0.001D) {
