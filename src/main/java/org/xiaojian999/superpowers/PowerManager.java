@@ -37,7 +37,7 @@ import java.util.UUID;
  * behaviour (and its state) lives in the matching {@code *PowerHandler}.
  */
 public final class PowerManager {
-    private static final int ULTIMATE_DOUBLE_TAP_WINDOW = 20;
+    static final int ULTIMATE_DOUBLE_TAP_WINDOW = 20;
     private static final int ULTIMATE_COOLDOWN = 600;
 
     private static final Map<UUID, Power> PLAYER_POWERS = new HashMap<>();
@@ -53,141 +53,26 @@ public final class PowerManager {
                 ? PLAYER_POWERS.get(playerUuid)
                 : PLAYER_SECOND_POWERS.get(playerUuid);
     }
+    static Long getLastUltimatePress(SlotKey k){ return LAST_ULTIMATE_PRESSES.get(k); }
+    static void clearUltimatePress(SlotKey k){ LAST_ULTIMATE_PRESSES.remove(k); }
 
     public static void initialize() {
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> registerCommands(dispatcher));
-
-        // Ensure C2S payloads are registered even if Glungus registration was missed (auto-generate if necessary).
-        // This makes PowerManager self-healing for new payloads added without editing Glungus.
-        org.xiaojian999.superpowers.network.PayloadRegistry.ensureRegistered(UsePowerPayload.class, org.xiaojian999.superpowers.network.PayloadDirection.C2S);
-        org.xiaojian999.superpowers.network.PayloadRegistry.ensureRegistered(GhostFlightSpeedPayload.class, org.xiaojian999.superpowers.network.PayloadDirection.C2S);
-        org.xiaojian999.superpowers.network.PayloadRegistry.ensureRegistered(GodLaserPayload.class, org.xiaojian999.superpowers.network.PayloadDirection.C2S);
-        org.xiaojian999.superpowers.network.PayloadRegistry.ensureRegistered(GodBlessPayload.class, org.xiaojian999.superpowers.network.PayloadDirection.C2S);
-        org.xiaojian999.superpowers.network.PayloadRegistry.ensureRegistered(GodLevitatePayload.class, org.xiaojian999.superpowers.network.PayloadDirection.C2S);
-        org.xiaojian999.superpowers.network.PayloadRegistry.ensureRegistered(GodFlightSpeedPayload.class, org.xiaojian999.superpowers.network.PayloadDirection.C2S);
-        org.xiaojian999.superpowers.network.PayloadRegistry.ensureRegistered(GodSmitePayload.class, org.xiaojian999.superpowers.network.PayloadDirection.C2S);
-        org.xiaojian999.superpowers.network.PayloadRegistry.ensureRegistered(GodAnnihilatePayload.class, org.xiaojian999.superpowers.network.PayloadDirection.C2S);
-        org.xiaojian999.superpowers.network.PayloadRegistry.ensureRegistered(GodNovaPayload.class, org.xiaojian999.superpowers.network.PayloadDirection.C2S);
-        org.xiaojian999.superpowers.network.PayloadRegistry.ensureRegistered(GodOmnipotencePayload.class, org.xiaojian999.superpowers.network.PayloadDirection.C2S);
-        org.xiaojian999.superpowers.network.PayloadRegistry.ensureRegistered(GodBanishPayload.class, org.xiaojian999.superpowers.network.PayloadDirection.C2S);
-        org.xiaojian999.superpowers.network.PayloadRegistry.ensureRegistered(GodNoClipPayload.class, org.xiaojian999.superpowers.network.PayloadDirection.C2S);
-        org.xiaojian999.superpowers.network.PayloadRegistry.ensureRegistered(GodGiantPayload.class, org.xiaojian999.superpowers.network.PayloadDirection.C2S);
-        org.xiaojian999.superpowers.network.PayloadRegistry.ensureRegistered(GodTelekinesisPayload.class, org.xiaojian999.superpowers.network.PayloadDirection.C2S);
-
-        ServerPlayNetworking.registerGlobalReceiver(UsePowerPayload.ID, (payload, context) ->
-                context.server().execute(() -> usePower(context.player(), payload.slot())));
-        ServerPlayNetworking.registerGlobalReceiver(GhostFlightSpeedPayload.ID, (payload, context) ->
-                context.server().execute(() -> GhostPowerHandler.adjustFlightSpeed(context.player(), payload.direction())));
-        ServerPlayNetworking.registerGlobalReceiver(GodLaserPayload.ID, (payload, context) ->
-                context.server().execute(() -> GodPowerHandler.setLaserActive(context.player(), payload.active())));
-        ServerPlayNetworking.registerGlobalReceiver(GodBlessPayload.ID, (payload, context) ->
-                context.server().execute(() -> GodPowerHandler.blessTarget(context.player())));
-        ServerPlayNetworking.registerGlobalReceiver(GodLevitatePayload.ID, (payload, context) ->
-                context.server().execute(() -> GodPowerHandler.levitateMobs(context.player())));
-        ServerPlayNetworking.registerGlobalReceiver(GodFlightSpeedPayload.ID, ((payload, context) ->
-                context.server().execute(() -> GodPowerHandler.adjustFlightSpeed(context.player(), payload.direction()))));
-        ServerPlayNetworking.registerGlobalReceiver(GodSmitePayload.ID, (payload, context) ->
-                context.server().execute(() -> GodPowerHandler.smiteTarget(context.player())));
-        ServerPlayNetworking.registerGlobalReceiver(GodAnnihilatePayload.ID, (payload, context) ->
-                context.server().execute(() -> GodPowerHandler.annihilateArea(context.player())));
-        ServerPlayNetworking.registerGlobalReceiver(GodNovaPayload.ID, (payload, context) ->
-                context.server().execute(() -> GodPowerHandler.holyNova(context.player())));
-        ServerPlayNetworking.registerGlobalReceiver(GodOmnipotencePayload.ID, (payload, context) ->
-                context.server().execute(() -> GodPowerHandler.activateOmnipotence(context.player())));
-        ServerPlayNetworking.registerGlobalReceiver(GodBanishPayload.ID, (payload, context) ->
-                context.server().execute(() -> GodPowerHandler.banishTarget(context.player())));
-        ServerPlayNetworking.registerGlobalReceiver(GodNoClipPayload.ID, (payload, context) ->
-                context.server().execute(() -> GodPowerHandler.toggleNoClip(context.player())));
-        ServerPlayNetworking.registerGlobalReceiver(GodGiantPayload.ID, (payload, context) ->
-                context.server().execute(() -> GodPowerHandler.toggleGiant(context.player())));
-        ServerPlayNetworking.registerGlobalReceiver(GodTelekinesisPayload.ID, (payload, context) ->
-                context.server().execute(() -> GodPowerHandler.toggleTelekinesis(context.player())));
-
-        UseEntityCallback.EVENT.register((player, world, hand, entity, hitResult) -> {
-            if (world.isClient() || !(player instanceof ServerPlayerEntity serverPlayer)) {
-                return ActionResult.PASS;
-            }
-            if (!(entity instanceof MobEntity mob)
-                    || !GhostPowerHandler.isFormActive(serverPlayer.getUuid())
-                    || GhostPowerHandler.isPossessed(mob.getUuid())) {
-                return ActionResult.PASS;
-            }
-            GhostPowerHandler.possess(serverPlayer, mob);
-            return ActionResult.FAIL;
-        });
-
-        ServerEntityEvents.ENTITY_LOAD.register((entity, world) -> {
-            if (entity instanceof SnowballEntity snowball
-                    && snowball.getOwner() instanceof ServerPlayerEntity owner) {
-                IcePowerHandler.onSnowballLoaded(snowball, owner);
-            }
-        });
-
-        ServerTickEvents.END_WORLD_TICK.register(world -> {
-            WaterPowerHandler.tick(world);
-            AirPowerHandler.tick(world);
-            FirePowerHandler.tick(world);
-            IcePowerHandler.tick(world);
-            NaturePowerHandler.tick(world);
-        });
-        ServerTickEvents.END_SERVER_TICK.register(server -> {
-            PowerCooldowns.tickAll();
-            GhostPowerHandler.tickServer(server);
-            FirePowerHandler.tickServer(server);
-            LightningPowerHandler.tickServer(server);
-            NaturePowerHandler.tickServer(server);
-            GodPowerHandler.tickServer(server);
-            for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
-                // ServerPlayerEntity.tick never reaches PlayerEntity.tick, which is where vanilla
-                // sets noClip for spectators, so form-based noclip must be applied here directly.
-                player.noClip = isNoClipActive(player);
-                AirPowerHandler.tickPlayer(player);
-                GhostPowerHandler.tickPlayer(player);
-                LightningPowerHandler.tickPlayer(player);
-                FirePowerHandler.tickPlayer(player);
-                GodPowerHandler.tickPlayer(player);
-            }
-        });
-        ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
-            sendPowerStatus(handler.player);
-            LightningPowerHandler.sendActiveFormStates(handler.player, server);
-            NaturePowerHandler.sendActiveEarthquakes(handler.player, server);
-        });
-        ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> {
-            UUID playerUuid = handler.player.getUuid();
-            CLIENT_WATER_WALKING_PLAYERS.remove(playerUuid);
-            AirPowerHandler.removePlayer(playerUuid);
-            FirePowerHandler.removePlayer(playerUuid);
-            GhostPowerHandler.removePlayer(handler.player);
-            LightningPowerHandler.removePlayer(handler.player);
-            IcePowerHandler.removePlayer(playerUuid);
-            NaturePowerHandler.removePlayer(handler.player);
-            GodPowerHandler.removePlayer(handler.player);
-            PLAYER_POWERS.remove(playerUuid);
-            PLAYER_SECOND_POWERS.remove(playerUuid);
-            PowerCooldowns.removeAll(playerUuid);
-            LAST_ULTIMATE_PRESSES.keySet().removeIf(key -> key.playerUuid().equals(playerUuid));
-        });
-        ServerLifecycleEvents.SERVER_STOPPED.register(server -> {
-            for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
-                GhostPowerHandler.disableForm(player);
-                LightningPowerHandler.disableForm(player);
-                GodPowerHandler.removePlayer(player);
-            }
-            AirPowerHandler.clearAll();
-            FirePowerHandler.clearAll();
-            GhostPowerHandler.clearAll();
-            IcePowerHandler.clearAll();
-            WaterPowerHandler.clearAll();
-            LightningPowerHandler.clearAll();
-            NaturePowerHandler.clearAll();
-            GodPowerHandler.clearAll(server);
-            PowerCooldowns.clearAll();
-            PLAYER_POWERS.clear();
-            PLAYER_SECOND_POWERS.clear();
-            CLIENT_WATER_WALKING_PLAYERS.clear();
-            LAST_ULTIMATE_PRESSES.clear();
-        });
+        ModEvents.register();
+    }
+    static void onDisconnect(UUID playerUuid, ServerPlayerEntity player) {
+        CLIENT_WATER_WALKING_PLAYERS.remove(playerUuid);
+        AirPowerHandler.removePlayer(playerUuid); FirePowerHandler.removePlayer(playerUuid);
+        GhostPowerHandler.removePlayer(player); LightningPowerHandler.removePlayer(player);
+        IcePowerHandler.removePlayer(playerUuid); NaturePowerHandler.removePlayer(player);
+        GodPowerHandler.removePlayer(player); PLAYER_POWERS.remove(playerUuid);
+        PLAYER_SECOND_POWERS.remove(playerUuid); PowerCooldowns.removeAll(playerUuid);
+        LAST_ULTIMATE_PRESSES.keySet().removeIf(k->k.playerUuid().equals(playerUuid));
+    }
+    static void onServerStopped(net.minecraft.server.MinecraftServer server){
+        for(ServerPlayerEntity p: server.getPlayerManager().getPlayerList()){ GhostPowerHandler.disableForm(p); LightningPowerHandler.disableForm(p); GodPowerHandler.removePlayer(p); }
+        AirPowerHandler.clearAll(); FirePowerHandler.clearAll(); GhostPowerHandler.clearAll(); IcePowerHandler.clearAll(); WaterPowerHandler.clearAll(); LightningPowerHandler.clearAll(); NaturePowerHandler.clearAll(); GodPowerHandler.clearAll(server);
+        PowerCooldowns.clearAll(); PLAYER_POWERS.clear(); PLAYER_SECOND_POWERS.clear(); CLIENT_WATER_WALKING_PLAYERS.clear(); LAST_ULTIMATE_PRESSES.clear();
     }
 
     private static void registerCommands(CommandDispatcher<ServerCommandSource> dispatcher) {
@@ -222,24 +107,8 @@ public final class PowerManager {
             return 1;
         }
 
-        Power selectedPower;
-        if (requestedPower.equalsIgnoreCase("ice")) {
-            selectedPower = Power.ICE;
-        } else if (requestedPower.equalsIgnoreCase("air")) {
-            selectedPower = Power.AIR;
-        } else if (requestedPower.equalsIgnoreCase("fire")) {
-            selectedPower = Power.FIRE;
-        } else if (requestedPower.equalsIgnoreCase("water")) {
-            selectedPower = Power.WATER;
-        } else if (requestedPower.equalsIgnoreCase("ghost")) {
-            selectedPower = Power.GHOST;
-        } else if (requestedPower.equalsIgnoreCase("lightning")) {
-            selectedPower = Power.LIGHTNING;
-        } else if (requestedPower.equalsIgnoreCase("nature")) {
-            selectedPower = Power.NATURE;
-        } else if (requestedPower.equalsIgnoreCase("god")) {
-            selectedPower = Power.GOD;
-        } else {
+        Power selectedPower = Power.fromString(requestedPower);
+        if (selectedPower == null) {
             context.getSource().sendError(Text.literal(
                     "Unknown superpower: " + requestedPower + ". Try ice, air, fire, water, ghost, lightning, nature, god, or none."
             ));
@@ -261,16 +130,7 @@ public final class PowerManager {
         PowerCooldowns.removeAll(playerUuid);
         LAST_ULTIMATE_PRESSES.remove(new SlotKey(playerUuid, slotIndex));
         sendPowerStatus(player);
-        String powerName = switch (selectedPower) {
-            case AIR -> "Air";
-            case FIRE -> "Fire";
-            case GHOST -> "Ghost";
-            case ICE -> "Ice";
-            case WATER -> "Water";
-            case LIGHTNING -> "Lightning";
-            case NATURE -> "Nature";
-            case GOD -> "God";
-        };
+        String powerName = selectedPower.displayName();
         String keys = slotIndex == 0 ? "keypad 1-3" : "keypad 4-6";
         String ultimateKey = slotIndex == 0 ? "keypad 3" : "keypad 6";
         String controls = selectedPower == Power.GOD
@@ -299,7 +159,7 @@ public final class PowerManager {
         sendPowerStatus(player);
     }
 
-    private static int usePower(ServerPlayerEntity player, int slot) {
+    static int usePower(ServerPlayerEntity player, int slot) {
         UUID playerUuid = player.getUuid();
         // Slots 1-3 target the first powerset, slots 4-6 the second powerset.
         int slotIndex = (slot - 1) / 3;
@@ -521,147 +381,8 @@ public final class PowerManager {
     }
 
     // ----- HUD status packets -----
-
-    static void sendPowerStatus(ServerPlayerEntity player) {
-        sendPowerStatusForSlot(player, 0);
-        sendPowerStatusForSlot(player, 1);
-    }
-
-    private static void sendPowerStatusForSlot(ServerPlayerEntity player, int slotIndex) {
-        UUID playerUuid = player.getUuid();
-        Power equippedPower = getEquippedPower(playerUuid, slotIndex);
-        if (equippedPower == null) {
-            // Always report an empty slot so the client can drop stale HUD state.
-            ServerPlayNetworking.send(player, new PowerStatusPayload(0, 0, 0, 0, -1, 0.0F, slotIndex));
-            return;
-        }
-
-        SlotKey slotKey = new SlotKey(playerUuid, slotIndex);
-        int flags = 0;
-        if (equippedPower == Power.ICE) {
-            flags |= PowerStatusPayload.ICE_EQUIPPED;
-        } else if (equippedPower == Power.AIR) {
-            flags |= PowerStatusPayload.AIR_EQUIPPED;
-            if (AirPowerHandler.isFlightActive(playerUuid)) {
-                flags |= PowerStatusPayload.AIR_FLIGHT_ACTIVE;
-            }
-        } else if (equippedPower == Power.FIRE) {
-            flags |= PowerStatusPayload.FIRE_EQUIPPED;
-            if (FirePowerHandler.isImmune(playerUuid)) {
-                flags |= PowerStatusPayload.FIRE_IMMUNE_ACTIVE;
-            }
-            if (FirePowerHandler.isBeamActive(slotKey)) {
-                flags |= PowerStatusPayload.FIRE_BEAM_ACTIVE;
-            }
-        } else if (equippedPower == Power.WATER) {
-            flags |= PowerStatusPayload.WATER_EQUIPPED;
-        } else if (equippedPower == Power.GHOST) {
-            flags |= PowerStatusPayload.GHOST_EQUIPPED;
-            if (GhostPowerHandler.isFormActive(playerUuid)) {
-                flags |= PowerStatusPayload.GHOST_FORM_ACTIVE;
-            }
-            if (GhostPowerHandler.isPossessing(playerUuid)) {
-                flags |= PowerStatusPayload.GHOST_POSSESSING;
-            }
-        } else if (equippedPower == Power.LIGHTNING) {
-            flags |= PowerStatusPayload.LIGHTNING_EQUIPPED;
-            if (LightningPowerHandler.isFormActive(slotKey)) {
-                flags |= PowerStatusPayload.LIGHTNING_FORM_ACTIVE;
-            }
-        } else if (equippedPower == Power.NATURE) {
-            flags |= PowerStatusPayload.NATURE_EQUIPPED;
-            if (NaturePowerHandler.isFlowerTrailActive(playerUuid)) {
-                flags |= PowerStatusPayload.NATURE_FLOWER_TRAIL_ACTIVE;
-            }
-            if (NaturePowerHandler.isVineRingActive(slotKey)) {
-                flags |= PowerStatusPayload.NATURE_VINE_RING_ACTIVE;
-            }
-            if (NaturePowerHandler.isEarthquakeActive(playerUuid)) {
-                flags |= PowerStatusPayload.NATURE_EARTHQUAKE_ACTIVE;
-            }
-        } else if (equippedPower == Power.GOD) {
-            flags |= PowerStatusPayload.GOD_EQUIPPED;
-            if (GodPowerHandler.isActive(playerUuid)) {
-                flags |= PowerStatusPayload.GOD_MODE_ACTIVE;
-            }
-            if (GodPowerHandler.isNoClipActive(playerUuid)) {
-                flags |= PowerStatusPayload.GOD_NOCLIP_ACTIVE;
-            }
-            if (GodPowerHandler.isGiant(playerUuid)) {
-                flags |= PowerStatusPayload.GOD_GIANT_ACTIVE;
-            }
-            if (GodPowerHandler.isTelekinesisHolding(playerUuid)) {
-                flags |= PowerStatusPayload.GOD_TELEKINESIS_ACTIVE;
-            }
-        }
-        if (equippedPower == Power.ICE && IcePowerHandler.isSnowballPrimed(playerUuid)) {
-            flags |= PowerStatusPayload.SNOWBALL_PRIMED;
-        }
-
-        Long lastUltimatePress = LAST_ULTIMATE_PRESSES.get(slotKey);
-        if (lastUltimatePress != null) {
-            long currentTick = player.getEntityWorld().getTime();
-            if (currentTick >= lastUltimatePress
-                    && currentTick - lastUltimatePress <= ULTIMATE_DOUBLE_TAP_WINDOW) {
-                flags |= PowerStatusPayload.ULTIMATE_PRIMED;
-            } else {
-                LAST_ULTIMATE_PRESSES.remove(slotKey);
-            }
-        }
-
-        int beamValue = PowerCooldowns.beamRemaining(slotKey);
-        int snowballValue = PowerCooldowns.secondPowerRemaining(slotKey);
-        if (equippedPower == Power.FIRE) {
-            Integer activeBeamTicks = FirePowerHandler.getActiveBeamTicks(slotKey);
-            if (activeBeamTicks != null && activeBeamTicks > 0) {
-                beamValue = activeBeamTicks;
-            }
-        }
-        if (equippedPower == Power.NATURE) {
-            Integer ringTicks = NaturePowerHandler.getVineRingRemaining(slotKey);
-            if (ringTicks != null) {
-                // While the Vine Ring spins, the second-power meter shows the time
-                // remaining in the ring instead of a cooldown.
-                snowballValue = ringTicks;
-            }
-        }
-        int ultimateValue = PowerCooldowns.ultimateRemaining(slotKey);
-        if (equippedPower == Power.LIGHTNING) {
-            Integer formTicks = LightningPowerHandler.getFormRemaining(slotKey);
-            if (formTicks != null) {
-                // While Storm Form is running, the ultimate meter shows the time
-                // remaining in the form instead of a cooldown.
-                ultimateValue = formTicks;
-            }
-        }
-        if (equippedPower == Power.NATURE) {
-            Integer quakeTicks = NaturePowerHandler.getEarthquakeRemaining(playerUuid);
-            if (quakeTicks != null) {
-                // While the earthquake rages, the ultimate meter shows the time
-                // remaining in the quake instead of a cooldown.
-                ultimateValue = quakeTicks;
-            }
-        }
-
-        int possessedMobId = -1;
-        float cameraOffsetY = 0.0F;
-        MobEntity possessedMob = GhostPowerHandler.getPossessedMob(player);
-        if (possessedMob != null) {
-            possessedMobId = possessedMob.getId();
-            cameraOffsetY = (float) ((possessedMob.getEyeY() - possessedMob.getY())
-                    - (player.getEyeY() - player.getY()));
-        }
-
-        ServerPlayNetworking.send(player, new PowerStatusPayload(
-                flags,
-                beamValue,
-                snowballValue,
-                ultimateValue,
-                possessedMobId,
-                cameraOffsetY,
-                slotIndex
-        ));
-    }
+    static void sendPowerStatus(ServerPlayerEntity player) { PowerStatusSender.sendAll(player); }
+    private static void sendPowerStatusForSlot(ServerPlayerEntity player, int slotIndex) { PowerStatusSender.sendForSlot(player, slotIndex); }
 
     static void sendCooldownMessage(ServerPlayerEntity player, String powerName, int remainingTicks) {
         int remainingSeconds = (remainingTicks + 19) / 20;

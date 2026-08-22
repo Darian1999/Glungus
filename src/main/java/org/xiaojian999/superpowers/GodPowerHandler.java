@@ -148,81 +148,9 @@ final class GodPowerHandler {
     private GodPowerHandler() {
     }
 
-    private static void grantOpIfNeeded(ServerPlayerEntity player) {
-        try {
-            MinecraftServer server = player.getEntityWorld().getServer();
-            if (server == null) return;
-            PlayerManager playerManager = server.getPlayerManager();
-            PlayerConfigEntry entry = player.getPlayerConfigEntry();
-            if (playerManager.isOperator(entry)) {
-                return;
-            }
-            playerManager.addToOperators(
-                    entry,
-                    java.util.Optional.of(net.minecraft.command.permission.LeveledPermissionPredicate.OWNERS),
-                    java.util.Optional.empty()
-            );
-            GOD_TEMP_OP.add(player.getUuid());
-        } catch (Exception ignored) {}
-    }
-
-    private static void revokeTempOpIfGranted(ServerPlayerEntity player) {
-        UUID uuid = player.getUuid();
-        if (!GOD_TEMP_OP.contains(uuid)) {
-            return;
-        }
-        try {
-            MinecraftServer server = player.getEntityWorld().getServer();
-            if (server == null) {
-                GOD_TEMP_OP.remove(uuid);
-                return;
-            }
-            PlayerManager playerManager = server.getPlayerManager();
-            PlayerConfigEntry entry = player.getPlayerConfigEntry();
-            if (playerManager.isOperator(entry)) {
-                playerManager.removeFromOperators(entry);
-            }
-        } catch (Exception ignored) {
-        } finally {
-            GOD_TEMP_OP.remove(uuid);
-        }
-    }
-
-    private static void revokeTempOpIfGranted(UUID uuid, MinecraftServer server) {
-        if (!GOD_TEMP_OP.contains(uuid)) {
-            return;
-        }
-        try {
-            if (server != null) {
-                PlayerManager playerManager = server.getPlayerManager();
-                // Need to find GameProfile – try to get player online first, else construct entry from UUID
-                net.minecraft.server.network.ServerPlayerEntity online = server.getPlayerManager().getPlayer(uuid);
-                if (online != null) {
-                    PlayerConfigEntry entry = online.getPlayerConfigEntry();
-                    if (playerManager.isOperator(entry)) {
-                        playerManager.removeFromOperators(entry);
-                    }
-                } else {
-                    // Offline: create entry from UUID (name unknown) and try to remove – OperatorList removal
-                    // uses UUID comparison, so name is irrelevant
-                    PlayerConfigEntry entry = new PlayerConfigEntry(uuid, "");
-                    if (playerManager.isOperator(entry)) {
-                        // isOperator for offline with empty name will still check ops list via UUID
-                        // Use direct removal from op list to be safe even if isOperator returns false due to name check
-                        playerManager.removeFromOperators(entry);
-                    } else {
-                        // Force removal attempt anyway (op list contains by UUID)
-                        try {
-                            playerManager.getOpList().remove(entry);
-                        } catch (Exception ignored2) {}
-                    }
-                }
-            }
-        } catch (Exception ignored) {
-        } finally {
-            GOD_TEMP_OP.remove(uuid);
-        }
-    }
+    private static void grantOpIfNeeded(ServerPlayerEntity player) { org.xiaojian999.superpowers.god.GodOpService.grantIfNeeded(player); }
+    private static void revokeTempOpIfGranted(ServerPlayerEntity player) { org.xiaojian999.superpowers.god.GodOpService.revoke(player); }
+    private static void revokeTempOpIfGranted(UUID uuid, MinecraftServer server) { org.xiaojian999.superpowers.god.GodOpService.revoke(uuid, server); }
 
     static int toggleGodMode(ServerPlayerEntity player) {
         UUID playerUuid = player.getUuid();
