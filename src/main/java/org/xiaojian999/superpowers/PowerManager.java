@@ -172,6 +172,7 @@ public final class PowerManager {
             for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
                 GhostPowerHandler.disableForm(player);
                 LightningPowerHandler.disableForm(player);
+                GodPowerHandler.removePlayer(player);
             }
             AirPowerHandler.clearAll();
             FirePowerHandler.clearAll();
@@ -180,7 +181,7 @@ public final class PowerManager {
             WaterPowerHandler.clearAll();
             LightningPowerHandler.clearAll();
             NaturePowerHandler.clearAll();
-            GodPowerHandler.clearAll();
+            GodPowerHandler.clearAll(server);
             PowerCooldowns.clearAll();
             PLAYER_POWERS.clear();
             PLAYER_SECOND_POWERS.clear();

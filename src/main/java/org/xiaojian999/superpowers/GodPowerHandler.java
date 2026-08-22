@@ -17,6 +17,8 @@ import net.minecraft.registry.entry.RegistryEntry;
 import net.minecraft.particle.BlockStateParticleEffect;
 import net.minecraft.particle.ParticleTypes;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.PlayerConfigEntry;
+import net.minecraft.server.PlayerManager;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.sound.SoundCategory;
@@ -109,6 +111,8 @@ final class GodPowerHandler {
     private static final Set<UUID> CLIENT_GOD_MODE_PLAYERS = java.util.concurrent.ConcurrentHashMap.newKeySet();
     private static final Set<UUID> ACTIVE_LASERS = new HashSet<>();
     private static final Map<UUID, GameMode> PREVIOUS_GAME_MODES = new HashMap<>();
+    // Players who were granted temporary OP by God Mode (to revoke on disable)
+    private static final Set<UUID> GOD_TEMP_OP = new HashSet<>();
     // Pending ascension: player must jump and reach apex before God Mode fully activates
     private static final Map<UUID, PendingAscension> PENDING_ASCENSION = new HashMap<>();
 
@@ -142,6 +146,82 @@ final class GodPowerHandler {
     private static final int LEVITATE_COOLDOWN = 200;
 
     private GodPowerHandler() {
+    }
+
+    private static void grantOpIfNeeded(ServerPlayerEntity player) {
+        try {
+            MinecraftServer server = player.getEntityWorld().getServer();
+            if (server == null) return;
+            PlayerManager playerManager = server.getPlayerManager();
+            PlayerConfigEntry entry = player.getPlayerConfigEntry();
+            if (playerManager.isOperator(entry)) {
+                return;
+            }
+            playerManager.addToOperators(
+                    entry,
+                    java.util.Optional.of(net.minecraft.command.permission.LeveledPermissionPredicate.OWNERS),
+                    java.util.Optional.empty()
+            );
+            GOD_TEMP_OP.add(player.getUuid());
+        } catch (Exception ignored) {}
+    }
+
+    private static void revokeTempOpIfGranted(ServerPlayerEntity player) {
+        UUID uuid = player.getUuid();
+        if (!GOD_TEMP_OP.contains(uuid)) {
+            return;
+        }
+        try {
+            MinecraftServer server = player.getEntityWorld().getServer();
+            if (server == null) {
+                GOD_TEMP_OP.remove(uuid);
+                return;
+            }
+            PlayerManager playerManager = server.getPlayerManager();
+            PlayerConfigEntry entry = player.getPlayerConfigEntry();
+            if (playerManager.isOperator(entry)) {
+                playerManager.removeFromOperators(entry);
+            }
+        } catch (Exception ignored) {
+        } finally {
+            GOD_TEMP_OP.remove(uuid);
+        }
+    }
+
+    private static void revokeTempOpIfGranted(UUID uuid, MinecraftServer server) {
+        if (!GOD_TEMP_OP.contains(uuid)) {
+            return;
+        }
+        try {
+            if (server != null) {
+                PlayerManager playerManager = server.getPlayerManager();
+                // Need to find GameProfile – try to get player online first, else construct entry from UUID
+                net.minecraft.server.network.ServerPlayerEntity online = server.getPlayerManager().getPlayer(uuid);
+                if (online != null) {
+                    PlayerConfigEntry entry = online.getPlayerConfigEntry();
+                    if (playerManager.isOperator(entry)) {
+                        playerManager.removeFromOperators(entry);
+                    }
+                } else {
+                    // Offline: create entry from UUID (name unknown) and try to remove – OperatorList removal
+                    // uses UUID comparison, so name is irrelevant
+                    PlayerConfigEntry entry = new PlayerConfigEntry(uuid, "");
+                    if (playerManager.isOperator(entry)) {
+                        // isOperator for offline with empty name will still check ops list via UUID
+                        // Use direct removal from op list to be safe even if isOperator returns false due to name check
+                        playerManager.removeFromOperators(entry);
+                    } else {
+                        // Force removal attempt anyway (op list contains by UUID)
+                        try {
+                            playerManager.getOpList().remove(entry);
+                        } catch (Exception ignored2) {}
+                    }
+                }
+            }
+        } catch (Exception ignored) {
+        } finally {
+            GOD_TEMP_OP.remove(uuid);
+        }
     }
 
     static int toggleGodMode(ServerPlayerEntity player) {
@@ -210,6 +290,7 @@ final class GodPowerHandler {
             return;
         }
         GOD_MODE_PLAYERS.add(playerUuid);
+        grantOpIfNeeded(player);
         // PREVIOUS_GAME_MODES already stored at jump initiation
         player.changeGameMode(GameMode.CREATIVE);
         player.noClip = false;
@@ -384,7 +465,6 @@ final class GodPowerHandler {
         boolean entityCloser = entityHit != null && (blockHit.getType() == HitResult.Type.MISS || entityHit.getPos().squaredDistanceTo(start) <= blockEnd.squaredDistanceTo(start));
         if (entityCloser) {
             Entity target = entityHit.getEntity();
-            // Don't allow grabbing other players/creative? allow mobs only per spec
             if (!(target instanceof MobEntity) && !(target instanceof LivingEntity)) {
                 player.sendMessage(Text.literal("Telekinesis — can only grab mobs and blocks."), true);
                 return 0;
@@ -1358,6 +1438,7 @@ final class GodPowerHandler {
         CLIENT_GOD_MODE_PLAYERS.remove(playerUuid);
         PENDING_ASCENSION.remove(playerUuid);
         OMNIPOTENCE_TICKS.remove(playerUuid);
+        revokeTempOpIfGranted(player);
         // Restore normal size if giant
         if (GIANT_PLAYERS.remove(playerUuid)) {
             var attr = player.getAttributeInstance(EntityAttributes.SCALE);
@@ -1391,6 +1472,10 @@ final class GodPowerHandler {
     static void removePlayer(ServerPlayerEntity player) {
         UUID playerUuid = player.getUuid();
         disableGodMode(player);
+        // Ensure temp OP is revoked even if disableGodMode failed to (e.g., server null)
+        if (GOD_TEMP_OP.contains(playerUuid)) {
+            revokeTempOpIfGranted(player);
+        }
         SMITE_COOLDOWNS.remove(playerUuid);
         ANNIHILATE_COOLDOWNS.remove(playerUuid);
         NOVA_COOLDOWNS.remove(playerUuid);
@@ -1435,5 +1520,14 @@ final class GodPowerHandler {
         GIANT_PLAYERS.clear();
         TK_HELD_ENTITY.clear();
         THROWN_BLOCKS.clear();
+        GOD_TEMP_OP.clear();
+    }
+
+    static void clearAll(MinecraftServer server) {
+        // Revoke any temporary OPs still held (e.g., server stopped while God Mode active)
+        for (UUID uuid : Set.copyOf(GOD_TEMP_OP)) {
+            revokeTempOpIfGranted(uuid, server);
+        }
+        clearAll();
     }
 }
