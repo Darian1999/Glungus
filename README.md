@@ -1,4 +1,4 @@
-# glungus lol
+# glungus
 
 so this is the superpowers mod idk
 
@@ -52,14 +52,14 @@ keypad to use powers, hud shows whats ready, check the json in `src/main/resourc
 - easing curves for hud animations n tornado growth n shake falloff
 - FastRandom splitmix64/xorshift stuff
 
-tweaked it for performance but idk its still kinda jank, nuked a deprecated thing earlier lol
+tweaked it for performance but idk its still kinda jank
 
 ## dev notes
 
 - mod id is `glungus`
 - entrypoints in `fabric.mod.json`
 - mixins in `glungus.mixins.json` / `glungus.client.mixins.json`
-- version is in `gradle.properties` dont forget to update it lol (forgot to update gradle.prop lol)
+- version is in `gradle.properties` dont forget to update it lol (forgot to update gradle.prop some commits back lol)
 - `Glungus.java` registers payloads n powers on init
 
 ## license
@@ -70,4 +70,14 @@ all rights reserved lol
 
 made by xiaojian999
 
-i just fixed too many bugs today so if its broken idk man open an issue lol
+i just fixed too many bugs earlier in development so if its broken idk man open an issue lol
+
+## do not use glungus with these mods
+1. WorldEdit GUI
+   - reason: makes the "reduce flight speed" key not work (it replaces it with some kind of error message)
+   - origin: china
+2. other superpower mods/datapacks (e.g. svm powers)
+   - reason: idk about interop
+
+## wip stuff
+- [ ] shadow powerset (will be added in 2.0)
