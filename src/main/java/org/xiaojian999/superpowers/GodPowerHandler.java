@@ -277,7 +277,7 @@ final class GodPowerHandler {
                         if (blockPos.getSquaredDistance(player.getBlockPos()) < 4.0D) {
                             continue;
                         }
-                        if (!world.isChunkLoaded(blockPos)) {
+                        if (!world.getChunkManager().isChunkLoaded(blockPos.getX() >> 4, blockPos.getZ() >> 4)) {
                             continue;
                         }
                         BlockState state = world.getBlockState(blockPos);
