@@ -47,7 +47,7 @@ final class LightningPowerHandler {
     private static final int LIGHTNING_FORM_STRIKE_COOLDOWN = 20;
 
     private static final Map<SlotKey, Integer> LIGHTNING_FORM_TICKS = new HashMap<>();
-    private static final Set<UUID> CLIENT_LIGHTNING_FORM_PLAYERS = new HashSet<>();
+    private static final Set<UUID> CLIENT_LIGHTNING_FORM_PLAYERS = java.util.concurrent.ConcurrentHashMap.newKeySet();
     private static final Map<UUID, Integer> STORM_STRIKE_COOLDOWNS = new HashMap<>();
 
     private LightningPowerHandler() {
@@ -372,12 +372,16 @@ final class LightningPowerHandler {
         if (player.getEntityWorld() instanceof ServerWorld endWorld) {
             broadcastFormState(endWorld, player.getUuid(), false);
         }
-        if (!player.isCreative() && !player.isSpectator()) {
+        boolean keepFlight = AirPowerHandler.isFlightActive(player.getUuid()) || GhostPowerHandler.isFormActive(player.getUuid());
+        if (!keepFlight && !player.isCreative() && !player.isSpectator()) {
             player.getAbilities().allowFlying = false;
             player.getAbilities().flying = false;
             player.sendAbilitiesUpdate();
         }
-        player.setInvisible(false);
+        boolean keepInvisible = GhostPowerHandler.isFormActive(player.getUuid());
+        if (!keepInvisible) {
+            player.setInvisible(false);
+        }
         PowerCooldowns.setUltimate(slotKey, LIGHTNING_FORM_COOLDOWN);
         PowerManager.sendPowerStatus(player);
         player.sendMessage(Text.literal("Storm Form ended. Cooldown: 30s."), true);

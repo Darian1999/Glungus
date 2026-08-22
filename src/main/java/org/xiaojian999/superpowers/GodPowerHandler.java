@@ -78,7 +78,7 @@ final class GodPowerHandler {
 
     private static final Set<UUID> GOD_MODE_PLAYERS = new HashSet<>();
     private static final Set<UUID> GOD_NOCLIP_PLAYERS = new HashSet<>();
-    private static final Set<UUID> CLIENT_GOD_NOCLIP_PLAYERS = new HashSet<>();
+    private static final Set<UUID> CLIENT_GOD_NOCLIP_PLAYERS = java.util.concurrent.ConcurrentHashMap.newKeySet();
     private static final Set<UUID> ACTIVE_LASERS = new HashSet<>();
     private static final Map<UUID, GameMode> PREVIOUS_GAME_MODES = new HashMap<>();
     private static final Map<UUID, Integer> SMITE_COOLDOWNS = new HashMap<>();
@@ -86,7 +86,11 @@ final class GodPowerHandler {
     private static final Map<UUID, Integer> NOVA_COOLDOWNS = new HashMap<>();
     private static final Map<UUID, Integer> OMNIPOTENCE_COOLDOWNS = new HashMap<>();
     private static final Map<UUID, Integer> BANISH_COOLDOWNS = new HashMap<>();
+    private static final Map<UUID, Integer> BLESS_COOLDOWNS = new HashMap<>();
+    private static final Map<UUID, Integer> LEVITATE_COOLDOWNS = new HashMap<>();
     private static final Map<UUID, Integer> OMNIPOTENCE_TICKS = new HashMap<>();
+    private static final int BLESS_COOLDOWN = 60;
+    private static final int LEVITATE_COOLDOWN = 200;
 
     private GodPowerHandler() {
     }
@@ -256,10 +260,14 @@ final class GodPowerHandler {
     private static void fireLaser(ServerWorld world, ServerPlayerEntity player) {
         Vec3d start = player.getCameraPosVec(1.0F);
         Vec3d direction = player.getRotationVec(1.0F).normalize();
-        Vec3d end = start.add(direction.multiply(LASER_RANGE));
+        Vec3d maxEnd = start.add(direction.multiply(LASER_RANGE));
+        BlockHitResult blockHit = world.raycast(new RaycastContext(
+                start, maxEnd, RaycastContext.ShapeType.COLLIDER, RaycastContext.FluidHandling.NONE, player));
+        Vec3d end = blockHit.getType() == HitResult.Type.MISS ? maxEnd : blockHit.getPos();
+        double effectiveRange = start.distanceTo(end);
 
-        // The beam bores a small tunnel through everything in its 100-block path.
-        for (double distance = 2.0D; distance <= LASER_RANGE; distance += 0.5D) {
+        // Tunnel: only to hit point, chunk-loaded guard, skip player feet
+        for (double distance = 2.0D; distance <= effectiveRange; distance += 0.5D) {
             Vec3d position = start.add(direction.multiply(distance));
             BlockPos center = BlockPos.ofFloored(position);
             for (int x = -1; x <= 1; x++) {
@@ -267,6 +275,9 @@ final class GodPowerHandler {
                     for (int z = -1; z <= 1; z++) {
                         BlockPos blockPos = center.add(x, y, z);
                         if (blockPos.getSquaredDistance(player.getBlockPos()) < 4.0D) {
+                            continue;
+                        }
+                        if (!world.isChunkLoaded(blockPos)) {
                             continue;
                         }
                         BlockState state = world.getBlockState(blockPos);
@@ -299,14 +310,14 @@ final class GodPowerHandler {
             }
         }
 
-        for (double distance = 0.0D; distance <= LASER_RANGE; distance += 1.0D) {
+        for (double distance = 0.0D; distance <= effectiveRange; distance += 1.0D) {
             Vec3d position = start.add(direction.multiply(distance));
             world.spawnParticles(ParticleTypes.WAX_ON, position.x, position.y, position.z, 2, 0.12D, 0.12D, 0.12D, 0.02D);
         }
     }
 
     static int blessTarget(ServerPlayerEntity player) {
-        if (!isActive(player.getUuid())) {
+        if (!isActive(player.getUuid()) || onCooldown(BLESS_COOLDOWNS, player, "Bless")) {
             return 0;
         }
         ServerWorld world = (ServerWorld) player.getEntityWorld();
@@ -347,6 +358,7 @@ final class GodPowerHandler {
         Vec3d position = target.getEntityPos().add(0.0D, target.getHeight() * 0.5D, 0.0D);
         world.spawnParticles(ParticleTypes.WAX_ON, position.x, position.y, position.z, 80, 0.8D, 1.0D, 0.8D, 0.08D);
         world.playSound(null, position.x, position.y, position.z, SoundEvents.BLOCK_BEACON_POWER_SELECT, SoundCategory.PLAYERS, 1.2F, 1.3F);
+        BLESS_COOLDOWNS.put(player.getUuid(), BLESS_COOLDOWN);
         player.sendMessage(Text.literal("The " + target.getDisplayName().getString() + " has been blessed."), true);
         return 1;
     }
@@ -356,7 +368,7 @@ final class GodPowerHandler {
      * (the player themselves and other players are never affected).
      */
     static int levitateMobs(ServerPlayerEntity player) {
-        if (!isActive(player.getUuid())) {
+        if (!isActive(player.getUuid()) || onCooldown(LEVITATE_COOLDOWNS, player, "Levitate")) {
             return 0;
         }
         ServerWorld world = (ServerWorld) player.getEntityWorld();
@@ -393,6 +405,7 @@ final class GodPowerHandler {
         Vec3d center = player.getEntityPos().add(0.0D, player.getHeight() * 0.5D, 0.0D);
         world.spawnParticles(ParticleTypes.WAX_ON, center.x, center.y, center.z, 120, 0.9D, 1.0D, 0.9D, 0.08D);
         world.playSound(null, center.x, center.y, center.z, SoundEvents.ENTITY_EVOKER_CAST_SPELL, SoundCategory.PLAYERS, 1.0F, 0.7F);
+        LEVITATE_COOLDOWNS.put(player.getUuid(), LEVITATE_COOLDOWN);
         player.sendMessage(Text.literal(count + " mob(s) are ascending to the sky."), true);
         return 1;
     }
@@ -813,6 +826,8 @@ final class GodPowerHandler {
         tickCooldownMap(NOVA_COOLDOWNS);
         tickCooldownMap(OMNIPOTENCE_COOLDOWNS);
         tickCooldownMap(BANISH_COOLDOWNS);
+        tickCooldownMap(BLESS_COOLDOWNS);
+        tickCooldownMap(LEVITATE_COOLDOWNS);
     }
 
     private static void tickCooldownMap(Map<UUID, Integer> cooldowns) {
@@ -869,6 +884,8 @@ final class GodPowerHandler {
         NOVA_COOLDOWNS.remove(playerUuid);
         OMNIPOTENCE_COOLDOWNS.remove(playerUuid);
         BANISH_COOLDOWNS.remove(playerUuid);
+        BLESS_COOLDOWNS.remove(playerUuid);
+        LEVITATE_COOLDOWNS.remove(playerUuid);
         OMNIPOTENCE_TICKS.remove(playerUuid);
         GOD_NOCLIP_PLAYERS.remove(playerUuid);
         CLIENT_GOD_NOCLIP_PLAYERS.remove(playerUuid);
@@ -885,6 +902,8 @@ final class GodPowerHandler {
         NOVA_COOLDOWNS.clear();
         OMNIPOTENCE_COOLDOWNS.clear();
         BANISH_COOLDOWNS.clear();
+        BLESS_COOLDOWNS.clear();
+        LEVITATE_COOLDOWNS.clear();
         OMNIPOTENCE_TICKS.clear();
     }
 }

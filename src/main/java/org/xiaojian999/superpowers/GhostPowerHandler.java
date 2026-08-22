@@ -49,7 +49,7 @@ final class GhostPowerHandler {
     private static final float GHOST_FLIGHT_SPEED_MAX = 0.50F;
 
     private static final Set<UUID> GHOST_FORM_PLAYERS = new HashSet<>();
-    private static final Set<UUID> CLIENT_GHOST_FORM_PLAYERS = new HashSet<>();
+    private static final Set<UUID> CLIENT_GHOST_FORM_PLAYERS = java.util.concurrent.ConcurrentHashMap.newKeySet();
     private static final Map<UUID, GameMode> GHOST_PREVIOUS_GAMEMODES = new HashMap<>();
     private static final Map<UUID, Float> GHOST_PREVIOUS_FLY_SPEEDS = new HashMap<>();
     private static final Map<UUID, Map<UUID, Integer>> SOUL_MARKED_ENTITIES = new HashMap<>();
@@ -417,7 +417,7 @@ final class GhostPowerHandler {
         tickPossession(player);
     }
 
-    static void tick(ServerWorld world) {
+    static void tickServer(net.minecraft.server.MinecraftServer server) {
         if (SOUL_MARKED_ENTITIES.isEmpty()) {
             return;
         }
@@ -429,25 +429,43 @@ final class GhostPowerHandler {
                     return true;
                 }
                 markEntry.setValue(remainingTicks);
-                Entity target = world.getEntity(markEntry.getKey());
-                if (target != null && target.isAlive() && remainingTicks % GHOST_SOUL_MARK_TICK_INTERVAL == 0) {
-                    Vec3d position = target.getEntityPos().add(0.0D, target.getHeight() * 0.5D, 0.0D);
-                    world.spawnParticles(
-                            ParticleTypes.SCULK_SOUL,
-                            position.x,
-                            position.y,
-                            position.z,
-                            2,
-                            0.25D,
-                            0.25D,
-                            0.25D,
-                            0.02D
-                    );
+                if (remainingTicks % GHOST_SOUL_MARK_TICK_INTERVAL == 0) {
+                    Entity target = findEntity(server, markEntry.getKey());
+                    if (target != null && target.isAlive() && target.getEntityWorld() instanceof ServerWorld targetWorld) {
+                        Vec3d position = target.getEntityPos().add(0.0D, target.getHeight() * 0.5D, 0.0D);
+                        targetWorld.spawnParticles(
+                                ParticleTypes.SCULK_SOUL,
+                                position.x,
+                                position.y,
+                                position.z,
+                                2,
+                                0.25D,
+                                0.25D,
+                                0.25D,
+                                0.02D
+                        );
+                    }
                 }
                 return false;
             });
             return ownerEntry.getValue().isEmpty();
         });
+    }
+
+    private static Entity findEntity(net.minecraft.server.MinecraftServer server, UUID uuid) {
+        for (ServerWorld world : server.getWorlds()) {
+            Entity entity = world.getEntity(uuid);
+            if (entity != null) {
+                return entity;
+            }
+        }
+        return null;
+    }
+
+    @Deprecated
+    static void tick(ServerWorld world) {
+        // Deprecated: world-tick caused double-decrement on multi-dimension servers.
+        // Use tickServer instead; kept only for backwards compatibility.
     }
 
     private static void startPossession(ServerPlayerEntity player, MobEntity mob) {

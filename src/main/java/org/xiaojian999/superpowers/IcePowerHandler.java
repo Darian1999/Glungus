@@ -103,10 +103,11 @@ final class IcePowerHandler {
     }
 
     static void handleSnowballCollision(SnowballEntity snowball, HitResult hitResult) {
-        if (snowball.getEntityWorld() instanceof ServerWorld world
-                && EMPOWERED_SNOWBALLS.remove(snowball.getUuid())) {
-            spawnTemporaryIceCube(world, hitResult);
+        boolean empowered = EMPOWERED_SNOWBALLS.remove(snowball.getUuid());
+        if (!empowered || !(snowball.getEntityWorld() instanceof ServerWorld world)) {
+            return;
         }
+        spawnTemporaryIceCube(world, hitResult);
     }
 
     static void clearPrimedSnowball(UUID playerUuid) {

@@ -28,6 +28,9 @@ final class HudState {
     }
 
     static Slot slot(int index) {
+        if (index < 0 || index >= SLOT_COUNT) {
+            return SLOTS[0];
+        }
         return SLOTS[index];
     }
 
@@ -37,6 +40,9 @@ final class HudState {
     }
 
     static void applyStatus(int slotIndex, PowerStatusPayload status) {
+        if (slotIndex < 0 || slotIndex >= SLOT_COUNT) {
+            return;
+        }
         Slot slot = SLOTS[slotIndex];
         slot.flags = status.flags();
         slot.power = powerName(status.flags());

@@ -45,7 +45,7 @@ final class HudData {
     );
 
     private static final Map<String, PowerConfig> POWERS = new ConcurrentHashMap<>();
-    private static Layout layout;
+    private static volatile Layout layout;
 
     private HudData() {
     }
@@ -53,8 +53,13 @@ final class HudData {
     static Layout layout() {
         Layout cached = layout;
         if (cached == null) {
-            cached = load(LAYOUT_ID, Layout.class);
-            layout = cached;
+            synchronized (HudData.class) {
+                cached = layout;
+                if (cached == null) {
+                    cached = load(LAYOUT_ID, Layout.class);
+                    layout = cached;
+                }
+            }
         }
         return cached;
     }
@@ -119,13 +124,21 @@ final class HudData {
 
     /** Parses a hex color string such as "0xFF8DEBFF" into an ARGB int. */
     static int color(String value) {
+        if (value == null || value.isEmpty()) {
+            return 0xFFFFFFFF;
+        }
         String hex = value;
         if (hex.startsWith("#")) {
             hex = hex.substring(1);
         } else if (hex.startsWith("0x") || hex.startsWith("0X")) {
             hex = hex.substring(2);
         }
-        return (int) Long.parseLong(hex, 16);
+        try {
+            return (int) Long.parseLong(hex, 16);
+        } catch (NumberFormatException e) {
+            LOGGER.warn("Invalid HUD color '{}', using white fallback", value, e);
+            return 0xFFFFFFFF;
+        }
     }
 
     static final class Layout {

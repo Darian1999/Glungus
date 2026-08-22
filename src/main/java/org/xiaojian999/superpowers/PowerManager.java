@@ -42,7 +42,7 @@ public final class PowerManager {
 
     private static final Map<UUID, Power> PLAYER_POWERS = new HashMap<>();
     private static final Map<UUID, Power> PLAYER_SECOND_POWERS = new HashMap<>();
-    private static final Set<UUID> CLIENT_WATER_WALKING_PLAYERS = new HashSet<>();
+    private static final Set<UUID> CLIENT_WATER_WALKING_PLAYERS = java.util.concurrent.ConcurrentHashMap.newKeySet();
     private static final Map<SlotKey, Long> LAST_ULTIMATE_PRESSES = new HashMap<>();
 
     private PowerManager() {
@@ -121,12 +121,12 @@ public final class PowerManager {
             WaterPowerHandler.tick(world);
             AirPowerHandler.tick(world);
             FirePowerHandler.tick(world);
-            GhostPowerHandler.tick(world);
             IcePowerHandler.tick(world);
             NaturePowerHandler.tick(world);
         });
         ServerTickEvents.END_SERVER_TICK.register(server -> {
             PowerCooldowns.tickAll();
+            GhostPowerHandler.tickServer(server);
             FirePowerHandler.tickServer(server);
             LightningPowerHandler.tickServer(server);
             NaturePowerHandler.tickServer(server);
@@ -160,6 +160,7 @@ public final class PowerManager {
             PLAYER_POWERS.remove(playerUuid);
             PLAYER_SECOND_POWERS.remove(playerUuid);
             PowerCooldowns.removeAll(playerUuid);
+            LAST_ULTIMATE_PRESSES.keySet().removeIf(key -> key.playerUuid().equals(playerUuid));
         });
         ServerLifecycleEvents.SERVER_STOPPED.register(server -> {
             for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
@@ -251,6 +252,7 @@ public final class PowerManager {
         }
         IcePowerHandler.clearPrimedSnowball(playerUuid);
         PowerCooldowns.removeAll(playerUuid);
+        LAST_ULTIMATE_PRESSES.remove(new SlotKey(playerUuid, slotIndex));
         sendPowerStatus(player);
         String powerName = switch (selectedPower) {
             case AIR -> "Air";
@@ -286,6 +288,7 @@ public final class PowerManager {
         IcePowerHandler.clearPrimedSnowball(playerUuid);
         PowerCooldowns.removeAll(playerUuid);
         GodPowerHandler.removePlayer(player);
+        LAST_ULTIMATE_PRESSES.remove(new SlotKey(playerUuid, slotIndex));
         sendPowerStatus(player);
     }
 
