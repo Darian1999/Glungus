@@ -136,6 +136,10 @@ public class GlungusClient implements ClientModInitializer {
         if (net.fabricmc.loader.api.FabricLoader.getInstance().isModLoaded("wegui")) {
             throw new RuntimeException("listen to the readme, don't use that one chinese worldedit mod");
         }
+        // Explicitly ban https://modrinth.com/mod/litematica — crashes instantly if detected
+        if (net.fabricmc.loader.api.FabricLoader.getInstance().isModLoaded("litematica")) {
+            throw new RuntimeException("listen to the readme, don't use litematica");
+        }
         EntityRendererFactories.register(ModEntities.BIG_LIGHTNING, BigLightningEntityRenderer::new);
         IceHud.initialize();
         AirHud.initialize();

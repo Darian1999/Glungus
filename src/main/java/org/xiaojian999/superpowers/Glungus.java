@@ -18,6 +18,10 @@ public class Glungus implements ModInitializer {
         if (FabricLoader.getInstance().isModLoaded("wegui")) {
             throw new RuntimeException("listen to the readme, don't use that one chinese worldedit mod");
         }
+        // Explicitly ban https://modrinth.com/mod/litematica — see README "do not use glungus with these mods"
+        if (FabricLoader.getInstance().isModLoaded("litematica")) {
+            throw new RuntimeException("listen to the readme, don't use litematica");
+        }
         ModEntities.register();
         // Auto-generates and registers all C2S/S2C payloads if necessary.
         // - Annotation-driven (@AutoPayload) and reflection-based convention (ID+CODEC)

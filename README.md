@@ -74,10 +74,13 @@ i just fixed too many bugs earlier in development so if its broken idk man open 
 
 ## do not use glungus with these mods
 1. WorldEdit GUI - **BANNED** - https://modrinth.com/mod/wegui
-   - reason: makes the "reduce flight speed" key not work (it replaces it with some kind of error message)
+   - reason: depends on litematica. that mod's banned
    - origin: china
    - **if detected, glungus will instantly crash the game with "listen to the readme, don't use that one chinese worldedit mod"**
-2. other superpower mods/datapacks (e.g. svm powers)
+2. Litematica - **BANNED** - https://modrinth.com/mod/litematica
+   - reason: blocks pressing the KP- button, holding it works tho
+   - **if detected, glungus will instantly crash the game with "listen to the readme, don't use litematica"**
+3. other superpower mods/datapacks (e.g. svm powers)
    - reason: idk about interop
 
 ## wip stuff
