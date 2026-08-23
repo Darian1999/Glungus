@@ -887,7 +887,7 @@ public final class GodExtraCommands {
                 if (dx*dx + dz*dz > radius*radius) continue;
                 for (int dy = -2; dy <= 2; dy++) {
                     BlockPos pos = center.add(dx, dy, dz);
-                    if (!world.isChunkLoaded(pos)) continue;
+                    if (!world.getChunkManager().isChunkLoaded(pos.getX() >> 4, pos.getZ() >> 4)) continue;
                     var state = world.getBlockState(pos);
                     if (state.isOf(Blocks.WATER) && world.getBlockState(pos.up()).isAir()) {
                         world.setBlockState(pos, Blocks.ICE.getDefaultState());
