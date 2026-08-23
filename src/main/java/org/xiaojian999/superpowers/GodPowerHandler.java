@@ -152,7 +152,7 @@ public final class GodPowerHandler {
     private static void revokeTempOpIfGranted(ServerPlayerEntity player) { org.xiaojian999.superpowers.god.GodOpService.revoke(player); }
     private static void revokeTempOpIfGranted(UUID uuid, MinecraftServer server) { org.xiaojian999.superpowers.god.GodOpService.revoke(uuid, server); }
 
-    static int toggleGodMode(ServerPlayerEntity player) {
+    public static int toggleGodMode(ServerPlayerEntity player) {
         UUID playerUuid = player.getUuid();
         if (GOD_MODE_PLAYERS.contains(playerUuid)) {
             disableGodMode(player);
@@ -308,7 +308,7 @@ public final class GodPowerHandler {
     }
 
     // ----- KP2: Giant toggle -----
-    static int toggleGiant(ServerPlayerEntity player) {
+    public static int toggleGiant(ServerPlayerEntity player) {
         UUID uuid = player.getUuid();
         if (!isActive(uuid)) {
             return 0;
@@ -339,12 +339,12 @@ public final class GodPowerHandler {
         return 1;
     }
 
-    static boolean isGiant(UUID uuid) {
+    public static boolean isGiant(UUID uuid) {
         return GIANT_PLAYERS.contains(uuid);
     }
 
     // ----- KP3: Telekinesis -----
-    static int toggleTelekinesis(ServerPlayerEntity player) {
+    public static int toggleTelekinesis(ServerPlayerEntity player) {
         UUID uuid = player.getUuid();
         if (!isActive(uuid)) {
             return 0;
@@ -447,7 +447,7 @@ public final class GodPowerHandler {
         return 0;
     }
 
-    static boolean isTelekinesisHolding(UUID uuid) {
+    public static boolean isTelekinesisHolding(UUID uuid) {
         return TK_HELD_ENTITY.containsKey(uuid);
     }
 
@@ -596,19 +596,19 @@ public final class GodPowerHandler {
         }
     }
 
-    static boolean isActive(UUID playerUuid) {
+    public static boolean isActive(UUID playerUuid) {
         return GOD_MODE_PLAYERS.contains(playerUuid);
     }
 
-    static boolean isPending(UUID playerUuid) {
+    public static boolean isPending(UUID playerUuid) {
         return PENDING_ASCENSION.containsKey(playerUuid);
     }
 
-    static boolean isNoClipActive(UUID playerUuid) {
+    public static boolean isNoClipActive(UUID playerUuid) {
         return GOD_NOCLIP_PLAYERS.contains(playerUuid);
     }
 
-    static boolean isClientNoClipActive(UUID playerUuid) {
+    public static boolean isClientNoClipActive(UUID playerUuid) {
         return CLIENT_GOD_NOCLIP_PLAYERS.contains(playerUuid);
     }
 
@@ -620,7 +620,7 @@ public final class GodPowerHandler {
         }
     }
 
-    static boolean isClientGodModeActive(UUID playerUuid) {
+    public static boolean isClientGodModeActive(UUID playerUuid) {
         return CLIENT_GOD_MODE_PLAYERS.contains(playerUuid);
     }
 
@@ -632,7 +632,7 @@ public final class GodPowerHandler {
         }
     }
 
-    static int toggleNoClip(ServerPlayerEntity player) {
+    public static int toggleNoClip(ServerPlayerEntity player) {
         UUID playerUuid = player.getUuid();
         if (!isActive(playerUuid)) {
             return 0;
@@ -661,7 +661,7 @@ public final class GodPowerHandler {
         return 1;
     }
 
-    static void setLaserActive(ServerPlayerEntity player, boolean active) {
+    public static void setLaserActive(ServerPlayerEntity player, boolean active) {
         if (active && isActive(player.getUuid())) {
             if (ACTIVE_LASERS.add(player.getUuid())) {
                 player.getEntityWorld().playSound(
@@ -813,7 +813,7 @@ public final class GodPowerHandler {
         }
     }
 
-    static int blessTarget(ServerPlayerEntity player) {
+    public static int blessTarget(ServerPlayerEntity player) {
         if (!isActive(player.getUuid()) || onCooldown(BLESS_COOLDOWNS, player, "Bless")) {
             return 0;
         }
@@ -864,7 +864,7 @@ public final class GodPowerHandler {
      * Levitates every mob within 30 blocks of the player up into the sky
      * (the player themselves and other players are never affected).
      */
-    static int levitateMobs(ServerPlayerEntity player) {
+    public static int levitateMobs(ServerPlayerEntity player) {
         if (!isActive(player.getUuid()) || onCooldown(LEVITATE_COOLDOWNS, player, "Levitate")) {
             return 0;
         }
@@ -907,7 +907,7 @@ public final class GodPowerHandler {
         return 1;
     }
 
-    static void adjustFlightSpeed(ServerPlayerEntity player, int direction){
+    public static void adjustFlightSpeed(ServerPlayerEntity player, int direction){
         if (!isActive(player.getUuid()) || direction == 0) {
             return;
         }
@@ -922,7 +922,7 @@ public final class GodPowerHandler {
     }
 
     /** Calls down a lightning bolt on whatever the god is looking at. */
-    static int smiteTarget(ServerPlayerEntity player) {
+    public static int smiteTarget(ServerPlayerEntity player) {
         if (!isActive(player.getUuid()) || onCooldown(SMITE_COOLDOWNS, player, "Smite")) {
             return 0;
         }
@@ -1010,7 +1010,7 @@ public final class GodPowerHandler {
     }
 
     /** Obliterates blocks and enemies in a sphere around the aimed-at point. */
-    static int annihilateArea(ServerPlayerEntity player) {
+    public static int annihilateArea(ServerPlayerEntity player) {
         if (!isActive(player.getUuid()) || onCooldown(ANNIHILATE_COOLDOWNS, player, "Annihilate")) {
             return 0;
         }
@@ -1118,7 +1118,7 @@ public final class GodPowerHandler {
     }
 
     /** Heals the god fully and smites every enemy around them with holy light. */
-    static int holyNova(ServerPlayerEntity player) {
+    public static int holyNova(ServerPlayerEntity player) {
         if (!isActive(player.getUuid()) || onCooldown(NOVA_COOLDOWNS, player, "Holy Nova")) {
             return 0;
         }
@@ -1190,7 +1190,7 @@ public final class GodPowerHandler {
      * Omnipotence: for 15 seconds the god becomes a simulation of omnipotence —
      * no damage source can harm them and their body is flooded with divine power.
      */
-    static int activateOmnipotence(ServerPlayerEntity player) {
+    public static int activateOmnipotence(ServerPlayerEntity player) {
         if (!isActive(player.getUuid()) || onCooldown(OMNIPOTENCE_COOLDOWNS, player, "Omnipotence")) {
             return 0;
         }
@@ -1219,7 +1219,7 @@ public final class GodPowerHandler {
         return 1;
     }
 
-    static boolean isOmnipotenceActive(UUID playerUuid) {
+    public static boolean isOmnipotenceActive(UUID playerUuid) {
         return OMNIPOTENCE_TICKS.getOrDefault(playerUuid, 0) > 0;
     }
 
@@ -1251,7 +1251,7 @@ public final class GodPowerHandler {
     }
 
     /** Throws the looked-at mob into the void: heavy damage plus wither and darkness. */
-    static int banishTarget(ServerPlayerEntity player) {
+    public static int banishTarget(ServerPlayerEntity player) {
         if (!isActive(player.getUuid()) || onCooldown(BANISH_COOLDOWNS, player, "Banish")) {
             return 0;
         }
@@ -1515,7 +1515,7 @@ public final class GodPowerHandler {
         }
     }
 
-    static void clearAll() {
+    public static void clearAll() {
         GOD_MODE_PLAYERS.clear();
         GOD_NOCLIP_PLAYERS.clear();
         CLIENT_GOD_NOCLIP_PLAYERS.clear();
@@ -1535,9 +1535,10 @@ public final class GodPowerHandler {
         TK_HELD_ENTITY.clear();
         THROWN_BLOCKS.clear();
         GOD_TEMP_OP.clear();
+        org.xiaojian999.superpowers.god.GodWorldState.reset();
     }
 
-    static void clearAll(MinecraftServer server) {
+    public static void clearAll(MinecraftServer server) {
         // Revoke any temporary OPs still held (e.g., server stopped while God Mode active)
         for (UUID uuid : Set.copyOf(GOD_TEMP_OP)) {
             revokeTempOpIfGranted(uuid, server);

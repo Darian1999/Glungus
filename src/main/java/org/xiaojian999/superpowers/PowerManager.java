@@ -90,6 +90,10 @@ public final class PowerManager {
                                 .executes(context -> usePower(
                                         context.getSource().getPlayerOrThrow(),
                                         IntegerArgumentType.getInteger(context, "slot"))))));
+        // 30 god-only commands: gravity is world-wide (not just player)
+        org.xiaojian999.superpowers.god.GodCommands.register(dispatcher);
+        // 38 additional god-only Singleplayer commands
+        org.xiaojian999.superpowers.god.GodExtraCommands.register(dispatcher);
     }
 
     private static int choosePower(CommandContext<ServerCommandSource> context, int slotIndex)
