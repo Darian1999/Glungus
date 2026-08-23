@@ -7,6 +7,7 @@
     "BlockItemMixin",
     "LivingEntityMixin",
     "PlayerEntityMixin",
+    "ServerPlayNetworkHandlerMixin",
     "ShulkerBoxBlockEntityMixin",
     "SnowballEntityMixin"
   ],

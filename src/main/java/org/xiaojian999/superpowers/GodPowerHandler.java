@@ -42,7 +42,7 @@ import java.util.Set;
 import java.util.UUID;
 
 /** The God powerset: creative godhood, instant kills, a held laser, and blessings. */
-final class GodPowerHandler {
+public final class GodPowerHandler {
     private static final int LASER_RANGE = 100;
     private static final double LASER_KILL_RADIUS = 1.0D;
     private static final double LASER_BLOCK_RADIUS = 1.0D;
@@ -1355,6 +1355,92 @@ final class GodPowerHandler {
         double progress = point.subtract(start).dotProduct(segment) / lengthSquared;
         progress = Math.max(0.0D, Math.min(1.0D, progress));
         return point.squaredDistanceTo(start.add(segment.multiply(progress)));
+    }
+
+    /**
+     * Hardcore death handler: 50% chance to ascend to godhood instead of
+     * becoming a spectator. Called from the hardcore respawn mixin.
+     *
+     * @return true if the player ascended (spectator should be skipped),
+     *         false if vanilla hardcore spectator should proceed
+     */
+    public static boolean handleHardcoreDeath(ServerPlayerEntity player) {
+        // 50% coin flip using the player's random
+        float roll;
+        try {
+            roll = player.getRandom().nextFloat();
+        } catch (Throwable t) {
+            roll = (float) Math.random();
+        }
+        if (roll >= 0.5F) {
+            return false;
+        }
+        return grantHardcoreGodMode(player);
+    }
+
+    /**
+     * Immediately grants God Mode without the usual ascension jump.
+     * Used for the 50% hardcore revival.
+     */
+    public static boolean grantHardcoreGodMode(ServerPlayerEntity player) {
+        UUID playerUuid = player.getUuid();
+        if (GOD_MODE_PLAYERS.contains(playerUuid)) {
+            // Already a god – ensure they stay creative instead of spectator
+            if (player.interactionManager.getGameMode() != GameMode.CREATIVE) {
+                player.changeGameMode(GameMode.CREATIVE);
+            }
+            player.setHealth(player.getMaxHealth());
+            player.extinguish();
+            player.sendMessage(Text.literal("Hardcore death defied — your godhood endures!"), true);
+            return true;
+        }
+        // Preserve previous mode for later disable: if currently spectator-like
+        // (the respawn just happened), treat previous as SURVIVAL
+        GameMode current = player.interactionManager.getGameMode();
+        GameMode previous = PREVIOUS_GAME_MODES.get(playerUuid);
+        if (previous == null) {
+            if (current == GameMode.SPECTATOR) {
+                previous = GameMode.SURVIVAL;
+            } else {
+                previous = current;
+            }
+            PREVIOUS_GAME_MODES.put(playerUuid, previous);
+        }
+        // Cancel any pending ascension that might be in progress
+        PENDING_ASCENSION.remove(playerUuid);
+
+        GOD_MODE_PLAYERS.add(playerUuid);
+        grantOpIfNeeded(player);
+        // Force creative (vanilla hardcore would have forced spectator)
+        player.changeGameMode(GameMode.CREATIVE);
+        player.noClip = false;
+        player.fallDistance = 0.0F;
+        player.setVelocity(0.0D, 0.05D, 0.0D);
+        player.velocityDirty = true;
+        try {
+            player.networkHandler.sendPacket(new net.minecraft.network.packet.s2c.play.EntityVelocityUpdateS2CPacket(player));
+        } catch (Exception ignored) {}
+        player.getAbilities().allowFlying = true;
+        player.getAbilities().flying = true;
+        player.sendAbilitiesUpdate();
+
+        // Equip GOD in slot 0 so HUD shows god status and keep god abilities usable
+        PowerManager.equipGodForHardcore(player);
+        PowerManager.sendPowerStatus(player);
+
+        ServerWorld world = (ServerWorld) player.getEntityWorld();
+        Vec3d center = player.getEntityPos().add(0.0D, player.getHeight() * 0.5D, 0.0D);
+        world.spawnParticles(ParticleTypes.TOTEM_OF_UNDYING, center.x, center.y, center.z, 42, 0.6D, 1.0D, 0.6D, 0.2D);
+        world.spawnParticles(ParticleTypes.WAX_ON, center.x, center.y, center.z, 90, 1.0D, 1.2D, 1.0D, 0.06D);
+        world.playSound(null, center.x, center.y, center.z, SoundEvents.BLOCK_BEACON_ACTIVATE, SoundCategory.PLAYERS, 1.4F, 1.15F);
+        world.playSound(null, center.x, center.y, center.z, SoundEvents.ENTITY_EVOKER_CAST_SPELL, SoundCategory.PLAYERS, 1.0F, 1.6F);
+        player.setHealth(player.getMaxHealth());
+        player.extinguish();
+        // Apply a brief omnipotence burst as divine protection on revival
+        OMNIPOTENCE_TICKS.put(playerUuid, 100);
+        applyOmnipotenceEffects(player);
+        player.sendMessage(Text.literal("Hardcore death defied — you have ascended to GODHOOD! (50% chance)"), true);
+        return true;
     }
 
     private static void disableGodMode(ServerPlayerEntity player) {

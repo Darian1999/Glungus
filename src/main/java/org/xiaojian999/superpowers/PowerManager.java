@@ -159,6 +159,19 @@ public final class PowerManager {
         sendPowerStatus(player);
     }
 
+    /**
+     * Equips GOD in slot 0 for the hardcore 50% ascension. Keeps any existing
+     * slot 2 power and clears ascension/ultimate state for a clean revival.
+     */
+    static void equipGodForHardcore(ServerPlayerEntity player) {
+        UUID uuid = player.getUuid();
+        PLAYER_POWERS.put(uuid, Power.GOD);
+        IcePowerHandler.clearPrimedSnowball(uuid);
+        PowerCooldowns.removeAll(uuid);
+        LAST_ULTIMATE_PRESSES.remove(new SlotKey(uuid, 0));
+        sendPowerStatus(player);
+    }
+
     static int usePower(ServerPlayerEntity player, int slot) {
         UUID playerUuid = player.getUuid();
         // Slots 1-3 target the first powerset, slots 4-6 the second powerset.
